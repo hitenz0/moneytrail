@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoneyTrail</title>
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            color: #20302b;
+            background: #f4f6f2;
+        }
+
+        header {
+            padding: 24px;
+            color: white;
+            background: #173f32;
+        }
+
+        header h1 { margin: 0 0 6px; }
+        header p { margin: 0; color: #d6e6dc; }
+
+        main {
+            max-width: 1000px;
+            margin: 30px auto;
+            padding: 0 18px;
+        }
+
+        .note { color: #5b6d63; }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+            margin: 22px 0;
+        }
+
+        .card, section {
+            padding: 20px;
+            border: 1px solid #dce5dd;
+            border-radius: 12px;
+            background: white;
+        }
+
+        .card span { color: #63756a; }
+        .card strong { display: block; margin-top: 10px; font-size: 27px; }
+        section { margin-bottom: 18px; }
+        section h2 { margin: 0 0 15px; font-size: 20px; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 11px 6px; border-bottom: 1px solid #e8eee8; text-align: left; }
+        th:last-child, td:last-child { text-align: right; }
+        th { color: #63756a; font-size: 13px; }
+        .table-wrap { overflow-x: auto; }
+        .refund { color: #14794d; }
+        .waiting { color: #996a1e; font-weight: bold; }
+
+        @media (max-width: 650px) {
+            .cards { grid-template-columns: 1fr; }
+            table { min-width: 540px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>MoneyTrail</h1>
+        <p>Where did my money go? Did that refund come back?</p>
+    </header>
+
+    <main>
+        <h2>Spending overview</h2>
+        <p class="note">Sample data for now. The page is a UI sketch; it does not read the CSV yet.</p>
+
+        <div class="cards">
+            <div class="card"><span>Purchases</span><strong>₹1,940</strong></div>
+            <div class="card"><span>Refunds received</span><strong>₹900</strong></div>
+            <div class="card"><span>Net spending</span><strong>₹1,040</strong></div>
+        </div>
+
+        <section>
+            <h2>Refund to check</h2>
+            <p><strong>Bookstore Online</strong> · ₹1,200 purchase</p>
+            <p>₹900 received <span class="waiting">· ₹300 still expected</span></p>
+        </section>
+
+        <section>
+            <h2>Recent transactions</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Date</th><th>What</th><th>Account</th><th>Amount</th></tr></thead>
+                    <tbody>
+                        <tr><td>12 Sep</td><td>Bookstore partial refund</td><td>Card</td><td class="refund">+₹900</td></tr>
+                        <tr><td>10 Sep</td><td>Card bill payment</td><td>Bank</td><td>−₹1,200</td></tr>
+                        <tr><td>5 Sep</td><td>Bookstore Online</td><td>Card</td><td>−₹1,200</td></tr>
+                        <tr><td>3 Sep</td><td>Metro card</td><td>Bank</td><td>−₹500</td></tr>
+                        <tr><td>2 Sep</td><td>Campus cafe</td><td>Bank</td><td>−₹240</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</body>
+</html>
