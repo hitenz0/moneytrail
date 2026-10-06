@@ -1,6 +1,6 @@
-date,description,amount,account,kind
-2026-09-02,UPI CAMPUS CAFE,-240.00,Bank,purchase
-2026-09-03,UPI METRO CARD,-500.00,Bank,purchase
-2026-09-05,BOOKSTORE ONLINE,-1200.00,Card,purchase
-2026-09-10,CARD BILL PAYMENT,-1200.00,Bank,transfer
-2026-09-12,BOOKSTORE PARTIAL REFUND,900.00,Card,refund
+date,description,amount,account,kind,category
+2026-09-02,UPI CAMPUS CAFE,-240.00,Bank,purchase,Food
+2026-09-03,UPI METRO CARD,-500.00,Bank,purchase,Transport
+2026-09-05,BOOKSTORE ONLINE,-1200.00,Card,purchase,Shopping
+2026-09-10,CARD BILL PAYMENT,-1200.00,Bank,transfer,
+2026-09-12,BOOKSTORE PARTIAL REFUND,900.00,Card,refund,
