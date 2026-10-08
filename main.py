@@ -1,5 +1,6 @@
-"""Read sample transactions and show MoneyTrail spending totals."""
+"""Read a transaction CSV and show MoneyTrail spending totals."""
 
+import argparse
 import csv
 import re
 from datetime import date
@@ -131,8 +132,7 @@ def suggest_refund_links(transactions):
     return suggestions
 
 
-if __name__ == "__main__":
-    rows = load_transactions(FILE)
+def print_report(rows):
     gross, refunds, net = summarize(rows)
     print(f"Loaded {len(rows)} transactions")
     print(f"Purchases:         INR {gross:,.2f}")
@@ -161,3 +161,23 @@ if __name__ == "__main__":
         print(f"  Refund {item['refund_id']} (INR {item['amount']:,.2f})"
               f" might belong to purchase {item['purchase_id']}"
               f" - shared word: {', '.join(item['shared_words'])}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Show spending and refunds from a MoneyTrail CSV.")
+    parser.add_argument("csv_file", nargs="?", type=Path, default=FILE,
+                        help="CSV to read (default: the bundled sample_transactions.csv)")
+    args = parser.parse_args()
+    try:
+        rows = load_transactions(args.csv_file)
+    except FileNotFoundError:
+        parser.exit(1, f"MoneyTrail: file not found: {args.csv_file}\n")
+    except (OSError, ValueError, csv.Error) as error:
+        parser.exit(1, f"MoneyTrail: could not read {args.csv_file}: {error}\n")
+
+    print(f"Source: {args.csv_file}")
+    print_report(rows)
+
+
+if __name__ == "__main__":
+    main()

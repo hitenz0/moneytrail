@@ -1,4 +1,6 @@
 import csv
+import subprocess
+import sys
 import tempfile
 import unittest
 from decimal import Decimal
@@ -121,6 +123,56 @@ class RefundWatchlistTests(unittest.TestCase):
         self.rows[4]["date"] = "2026-09-99"
         with self.assertRaisesRegex(ValueError, "Line 6"):
             self.load_rows()
+
+
+class CommandLineTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.folder = Path(self.temp.name)
+        self.script = Path(__file__).with_name("main.py").resolve()
+
+    def run_script(self, *args):
+        return subprocess.run([sys.executable, str(self.script), *args], cwd=self.folder,
+                              capture_output=True, text=True, timeout=10)
+
+    def test_default_sample_works_from_another_folder(self):
+        result = self.run_script()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Loaded 5 transactions", result.stdout)
+        self.assertIn("Net spending:      INR 1,040.00", result.stdout)
+
+    def test_chosen_file_with_spaces_and_no_input_changes(self):
+        path = self.folder / "my transactions.csv"
+        path.write_text(
+            "id,date,description,amount,account,kind,category,refund_expected,refund_for\n"
+            "p1,2026-09-05,BOOKSTORE ONLINE,-125.00,Card,purchase,Shopping,125.00,\n"
+            "r1,2026-09-06,BOOKSTORE REFUND,50.00,Card,refund,,,\n",
+            encoding="utf-8")
+        before = path.read_bytes()
+        result = self.run_script(path.name)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Loaded 2 transactions", result.stdout)
+        self.assertIn("Net spending:      INR 75.00", result.stdout)
+        self.assertIn("Refund r1 (INR 50.00) might belong to purchase p1", result.stdout)
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_missing_file_has_clear_error(self):
+        result = self.run_script("missing.csv")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("file not found: missing.csv", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertEqual(result.stdout, "")
+
+    def test_invalid_row_has_line_number_without_traceback(self):
+        path = self.folder / "bad.csv"
+        path.write_text(FILE.read_text(encoding="utf-8").replace("2026-09-02", "2026-09-99"),
+                        encoding="utf-8")
+        result = self.run_script(str(path))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("Line 2", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertEqual(result.stdout, "")
 
 
 if __name__ == "__main__":

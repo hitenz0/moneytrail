@@ -4,9 +4,9 @@ I use UPI and a credit card, and it can be hard to see where small spends went o
 
 The project will grow in small steps. The Python script reads a simple CSV of sample transactions and calculates spending. `index.html` is an early UI sketch using the same sample numbers. The page is static for now; it does not read the CSV yet.
 
-## Current milestone: possible refund links
+## Current milestone: choose a CSV file
 
-`main.py` loads `sample_transactions.csv` and reports:
+`main.py` loads the CSV you choose (or `sample_transactions.csv` by default) and reports:
 
 - purchases, which count as spending;
 - confirmed refund credits, which reduce net spending;
@@ -31,7 +31,7 @@ Expected refunds do not reduce net spending. Only actual refund rows do, includi
 
 The script suggests a link only when an unlinked refund and a watched purchase share a useful word in their descriptions, the refund is dated on or after the purchase, and its amount fits within what is still due. It ignores common words like `refund`, `card`, and `online`. This is only a clue: two purchases can both be suggested, and a real refund can have no shared words. Check your statement or order details before putting the purchase ID in `refund_for`.
 
-To try it with the sample data, clear `t3` from transaction `t5`'s `refund_for` field, run `python main.py`, then restore the link. You should see `t5` suggested for `t3` because both descriptions contain `BOOKSTORE`. While the field is blank, the INR 900 still counts in total refunds received, but the watchlist shows the full INR 1,200 as still due.
+Try the separate example with `python main.py examples/unlinked_refund.csv`. Purchase `p1` expects INR 1,200 back, and refund `r1` confirms INR 900. The last INR 300 is present as credit `r2`, but it has no confirmed link yet. The script suggests linking `r2` to `p1`. After checking the credit, enter `p1` in `r2`'s `refund_for` field and rerun to see **Received**. Both credits count in total refunds received even before you link them.
 
 ## Run
 
@@ -40,6 +40,16 @@ Requires Python 3.10 or newer:
 ```powershell
 python main.py
 ```
+
+To read another file, pass its path. Put quotes around paths containing spaces:
+
+```powershell
+python main.py examples/unlinked_refund.csv
+python main.py "D:\statements\october transactions.csv"
+python main.py --help
+```
+
+Files must use the same columns as `sample_transactions.csv`, UTF-8 text, and dates like `2026-09-05`. Direct bank exports may need their columns converted first. Relative paths start from your terminal's current folder. The script reads the file without changing it and reports missing files or invalid rows as an error.
 
 Open `index.html` in a browser to see the UI sketch.
 

@@ -1,0 +1,4 @@
+id,date,description,amount,account,kind,category,refund_expected,refund_for
+p1,2026-09-05,BOOKSTORE ONLINE,-1200.00,Card,purchase,Shopping,1200.00,
+r1,2026-09-12,BOOKSTORE PARTIAL REFUND,900.00,Card,refund,,,p1
+r2,2026-09-15,BOOKSTORE FINAL REFUND,300.00,Card,refund,,,
