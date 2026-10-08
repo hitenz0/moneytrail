@@ -6,7 +6,8 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 
-from main import FILE, load_transactions, refund_watchlist, suggest_refund_links, summarize
+from main import (FILE, load_transactions, refund_watchlist, spending_by_category,
+                  suggest_category, suggest_refund_links, summarize)
 
 
 class RefundWatchlistTests(unittest.TestCase):
@@ -124,6 +125,25 @@ class RefundWatchlistTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Line 6"):
             self.load_rows()
 
+    def test_custom_category_is_kept_in_totals(self):
+        self.rows[0]["category"] = "Campus expenses"
+        totals = spending_by_category(self.load_rows())
+        self.assertEqual(totals["Campus expenses"], Decimal("240"))
+        self.assertNotIn("Food", totals)
+
+
+class CategoryTests(unittest.TestCase):
+    def test_known_words_ignore_case_and_punctuation(self):
+        for description, category in (("UPI CaFe-23", "Food"), ("OLA*RIDE", "Transport"),
+                                      ("BOOKSTORE ONLINE", "Shopping")):
+            with self.subTest(description=description):
+                self.assertEqual(suggest_category(description), category)
+
+    def test_unknown_ambiguous_and_partial_words_have_no_guess(self):
+        for description in ("LOCAL SHOP", "BOOKSTORE CAFE", "METROPOLITAN", ""):
+            with self.subTest(description=description):
+                self.assertIsNone(suggest_category(description))
+
 
 class CommandLineTests(unittest.TestCase):
     def setUp(self):
@@ -146,7 +166,7 @@ class CommandLineTests(unittest.TestCase):
         path = self.folder / "my transactions.csv"
         path.write_text(
             "id,date,description,amount,account,kind,category,refund_expected,refund_for\n"
-            "p1,2026-09-05,BOOKSTORE ONLINE,-125.00,Card,purchase,Shopping,125.00,\n"
+            "p1,2026-09-05,BOOKSTORE ONLINE,-125.00,Card,purchase,,125.00,\n"
             "r1,2026-09-06,BOOKSTORE REFUND,50.00,Card,refund,,,\n",
             encoding="utf-8")
         before = path.read_bytes()
@@ -154,6 +174,8 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Loaded 2 transactions", result.stdout)
         self.assertIn("Net spending:      INR 75.00", result.stdout)
+        self.assertIn("Uncategorized: INR 125.00", result.stdout)
+        self.assertIn("p1 - BOOKSTORE ONLINE: suggested Shopping", result.stdout)
         self.assertIn("Refund r1 (INR 50.00) might belong to purchase p1", result.stdout)
         self.assertEqual(path.read_bytes(), before)
 

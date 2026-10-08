@@ -11,6 +11,11 @@ from pathlib import Path
 FILE = Path(__file__).with_name("sample_transactions.csv")
 KINDS = {"purchase", "refund", "transfer"}
 COMMON_WORDS = {"card", "credit", "online", "partial", "payment", "refund", "return", "upi"}
+CATEGORY_WORDS = {
+    "Food": {"cafe", "canteen", "swiggy", "zomato"},
+    "Transport": {"bus", "metro", "ola", "uber"},
+    "Shopping": {"amazon", "bookstore", "flipkart"},
+}
 
 
 def load_transactions(path):
@@ -42,8 +47,6 @@ def load_transactions(path):
                     raise ValueError(f"unknown kind: {kind}")
                 if kind == "purchase" and amount >= 0:
                     raise ValueError("a purchase must have a negative amount")
-                if kind == "purchase" and not category:
-                    raise ValueError("a purchase needs a category")
                 if kind == "refund" and amount <= 0:
                     raise ValueError("a refund must have a positive amount")
                 if not refund_expected.is_finite() or refund_expected < 0:
@@ -77,9 +80,15 @@ def spending_by_category(transactions):
     totals = {}
     for row in transactions:
         if row["kind"] == "purchase":
-            category = row["category"]
+            category = row["category"] or "Uncategorized"
             totals[category] = totals.get(category, Decimal(0)) - row["amount"]
     return totals
+
+
+def suggest_category(description):
+    words = set(re.findall(r"[a-z0-9]+", description.lower()))
+    matches = [category for category, keywords in CATEGORY_WORDS.items() if words & keywords]
+    return matches[0] if len(matches) == 1 else None
 
 
 def refund_watchlist(transactions):
@@ -141,6 +150,14 @@ def print_report(rows):
     print("\nPurchases by category:")
     for category, amount in sorted(spending_by_category(rows).items(), key=lambda item: -item[1]):
         print(f"  {category}: INR {amount:,.2f}")
+
+    uncategorized = [row for row in rows if row["kind"] == "purchase" and not row["category"]]
+    if uncategorized:
+        print("\nCategories to review (enter your choice in the CSV):")
+        for row in uncategorized:
+            category = suggest_category(row["description"])
+            suggestion = f"suggested {category}" if category else "choose a category"
+            print(f"  {row['id']} - {row['description']}: {suggestion}")
 
     print("\nRefund watchlist:")
     watchlist = refund_watchlist(rows)

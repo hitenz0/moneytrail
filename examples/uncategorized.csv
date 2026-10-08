@@ -1,0 +1,5 @@
+id,date,description,amount,account,kind,category,refund_expected,refund_for
+p1,2026-09-02,UPI CAMPUS CAFE,-240.00,Bank,purchase,,,
+p2,2026-09-03,UPI METRO CARD,-500.00,Bank,purchase,,,
+p3,2026-09-05,BOOKSTORE ONLINE,-1200.00,Card,purchase,,,
+p4,2026-09-06,LOCAL SHOP,-150.00,Bank,purchase,,,

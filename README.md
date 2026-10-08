@@ -4,18 +4,24 @@ I use UPI and a credit card, and it can be hard to see where small spends went o
 
 The project will grow in small steps. The Python script reads a simple CSV of sample transactions and calculates spending. `index.html` is an early UI sketch using the same sample numbers. The page is static for now; it does not read the CSV yet.
 
-## Current milestone: choose a CSV file
+## Current milestone: category suggestions
 
 `main.py` loads the CSV you choose (or `sample_transactions.csv` by default) and reports:
 
 - purchases, which count as spending;
 - confirmed refund credits, which reduce net spending;
 - transfers, such as paying a credit-card bill, which are not another purchase;
-- purchases grouped by a category you enter in the CSV;
+- purchases grouped by a category you enter in the CSV, with suggestions for blank categories;
 - expected refunds, linked credits, and the amount still due for each watched purchase;
 - possible links for unlinked refund credits.
 
 The `kind` and purchase `category` columns are entered manually for now. The category breakdown shows purchases before refunds. Refund links are also entered manually. All rows are synthetic; no bank login or personal statement is needed.
+
+## Fill in missing categories
+
+You can leave a purchase's `category` field blank. It will count under **Uncategorized** until you enter a category yourself. The script uses a short keyword list to suggest Food, Transport, or Shopping. It matches whole words without caring about capital letters. If a description matches two categories or none, it asks you to choose instead.
+
+Try `python main.py examples/uncategorized.csv`. It suggests Food for the campus cafe, Transport for the metro card, and Shopping for the bookstore. The local shop has no suggestion. Enter your choices in the CSV's `category` column and rerun to see the spending split. You can use your own category names, and entered categories take priority over suggestions.
 
 ## Track a refund
 
@@ -53,7 +59,7 @@ Files must use the same columns as `sample_transactions.csv`, UTF-8 text, and da
 
 Open `index.html` in a browser to see the UI sketch.
 
-Run the refund checks with:
+Run the checks with:
 
 ```powershell
 python -m unittest -v
@@ -61,7 +67,6 @@ python -m unittest -v
 
 ## Planned next steps
 
-1. Let the user correct a suggested category instead of entering every category manually.
-2. Connect the browser interface to the calculations once the rules are trustworthy.
+Connect the browser interface to the calculations, with the UI design decided separately.
 
 I'm adding these pieces one at a time so the calculations stay easy to check.
