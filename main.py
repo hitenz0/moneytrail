@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+import io
 import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -9,6 +10,8 @@ from pathlib import Path
 
 
 FILE = Path(__file__).with_name("sample_transactions.csv")
+FIELDS = ["id", "date", "description", "amount", "account", "kind", "category",
+          "refund_expected", "refund_for"]
 KINDS = {"purchase", "refund", "transfer"}
 COMMON_WORDS = {"card", "credit", "online", "partial", "payment", "refund", "return", "upi"}
 CATEGORY_WORDS = {
@@ -19,55 +22,69 @@ CATEGORY_WORDS = {
 
 
 def load_transactions(path):
-    with path.open(newline="", encoding="utf-8-sig") as file:
-        reader = csv.DictReader(file)
-        expected = {"id", "date", "description", "amount", "account", "kind", "category",
-                    "refund_expected", "refund_for"}
-        if not reader.fieldnames or not expected.issubset(reader.fieldnames):
-            raise ValueError("CSV needs these columns: " + ", ".join(sorted(expected)))
+    return parse_transactions(path.read_text(encoding="utf-8-sig"))
 
-        transactions = []
-        seen_ids = set()
-        for line_number, row in enumerate(reader, start=2):
-            try:
-                if any(row[column] is None for column in expected):
-                    raise ValueError("missing CSV fields")
-                transaction_id = row["id"].strip()
-                transaction_date = date.fromisoformat(row["date"].strip()).isoformat()
-                amount = Decimal(row["amount"])
-                kind = row["kind"].strip().lower()
-                category = row["category"].strip()
-                refund_expected = Decimal(row["refund_expected"].strip() or "0")
-                refund_for = row["refund_for"].strip()
-                if not transaction_id or transaction_id in seen_ids:
-                    raise ValueError("each transaction needs a unique id")
-                if not amount.is_finite():
-                    raise ValueError("amount must be a number")
-                if kind not in KINDS:
-                    raise ValueError(f"unknown kind: {kind}")
-                if kind == "purchase" and amount >= 0:
-                    raise ValueError("a purchase must have a negative amount")
-                if kind == "refund" and amount <= 0:
-                    raise ValueError("a refund must have a positive amount")
-                if not refund_expected.is_finite() or refund_expected < 0:
-                    raise ValueError("expected refund must be a finite, non-negative amount")
-                if refund_expected > 0 and (kind != "purchase" or refund_expected > -amount):
-                    raise ValueError("expected refund must belong to a purchase and cannot exceed its amount")
-                if refund_for and kind != "refund":
-                    raise ValueError("only a refund can link to a purchase")
-            except (ValueError, TypeError, InvalidOperation) as error:
-                raise ValueError(f"Line {line_number}: {error}") from error
-            seen_ids.add(transaction_id)
-            transactions.append({**row, "id": transaction_id, "date": transaction_date,
-                                 "amount": amount, "kind": kind,
-                                 "category": category, "refund_expected": refund_expected,
-                                 "refund_for": refund_for})
 
-        purchases = {row["id"] for row in transactions if row["kind"] == "purchase"}
-        for row in transactions:
-            if row["refund_for"] and row["refund_for"] not in purchases:
-                raise ValueError(f"Transaction {row['id']}: refund_for must point to an existing purchase id")
-        return transactions
+def parse_transactions(text):
+    reader = csv.DictReader(io.StringIO(text.lstrip("\ufeff")), strict=True)
+    expected = set(FIELDS)
+    if not reader.fieldnames or not expected.issubset(reader.fieldnames):
+        raise ValueError("CSV needs these columns: " + ", ".join(sorted(expected)))
+    if len(reader.fieldnames) != len(set(reader.fieldnames)):
+        raise ValueError("CSV column names must be unique")
+
+    transactions = []
+    seen_ids = set()
+    for line_number, row in enumerate(reader, start=2):
+        try:
+            if None in row:
+                raise ValueError("too many CSV fields")
+            if any(row[column] is None for column in expected):
+                raise ValueError("missing CSV fields")
+            transaction_id = row["id"].strip()
+            if not row["description"].strip() or not row["account"].strip():
+                raise ValueError("description and account cannot be blank")
+            transaction_date = date.fromisoformat(row["date"].strip()).isoformat()
+            amount = Decimal(row["amount"])
+            kind = row["kind"].strip().lower()
+            category = row["category"].strip()
+            refund_expected = Decimal(row["refund_expected"].strip() or "0")
+            refund_for = row["refund_for"].strip()
+            if not transaction_id or transaction_id in seen_ids:
+                raise ValueError("each transaction needs a unique id")
+            if not amount.is_finite():
+                raise ValueError("amount must be a number")
+            if abs(amount) > Decimal("999999999.99") or amount != amount.quantize(Decimal("0.01")):
+                raise ValueError("amount must have at most two decimal places and be below one billion")
+            if kind not in KINDS:
+                raise ValueError(f"unknown kind: {kind}")
+            if kind == "purchase" and amount >= 0:
+                raise ValueError("a purchase must have a negative amount")
+            if kind == "refund" and amount <= 0:
+                raise ValueError("a refund must have a positive amount")
+            if not refund_expected.is_finite() or refund_expected < 0:
+                raise ValueError("expected refund must be a finite, non-negative amount")
+            if refund_expected > Decimal("999999999.99") or refund_expected != refund_expected.quantize(Decimal("0.01")):
+                raise ValueError("expected refund must have at most two decimal places and be below one billion")
+            if refund_expected > 0 and (kind != "purchase" or refund_expected > -amount):
+                raise ValueError("expected refund must belong to a purchase and cannot exceed its amount")
+            if refund_for and kind != "refund":
+                raise ValueError("only a refund can link to a purchase")
+        except (ValueError, TypeError, InvalidOperation) as error:
+            raise ValueError(f"Line {line_number}: {error}") from error
+        seen_ids.add(transaction_id)
+        transactions.append({**row, "id": transaction_id, "date": transaction_date,
+                             "amount": amount, "kind": kind,
+                             "category": category, "refund_expected": refund_expected,
+                             "refund_for": refund_for})
+
+    purchases = {row["id"]: row for row in transactions if row["kind"] == "purchase"}
+    for row in transactions:
+        if row["refund_for"] and row["refund_for"] not in purchases:
+            raise ValueError(f"Transaction {row['id']}: refund_for must point to an existing purchase id")
+        if row["refund_for"] and row["date"] < purchases[row["refund_for"]]["date"]:
+            raise ValueError(f"Transaction {row['id']}: a refund cannot link to a later purchase")
+    return transactions
 
 
 def summarize(transactions):

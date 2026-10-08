@@ -1,72 +1,100 @@
 # MoneyTrail
 
-I use UPI and a credit card, and it can be hard to see where small spends went or whether a refund actually came back. MoneyTrail is a small project I'm building around those two questions.
+I use UPI and a credit card, and it can be hard to see where small spends went or whether a refund actually came back. MoneyTrail is a project I'm building around those two questions.
 
-The project will grow in small steps. The Python script reads a simple CSV of sample transactions and calculates spending. `index.html` is an early UI sketch using the same sample numbers. The page is static for now; it does not read the CSV yet.
+## Run the web app
 
-## Current milestone: category suggestions
+Requires Python 3.10 or newer. There are no extra packages to install.
 
-`main.py` loads the CSV you choose (or `sample_transactions.csv` by default) and reports:
+```powershell
+python app.py
+```
 
-- purchases, which count as spending;
-- confirmed refund credits, which reduce net spending;
-- transfers, such as paying a credit-card bill, which are not another purchase;
-- purchases grouped by a category you enter in the CSV, with suggestions for blank categories;
-- expected refunds, linked credits, and the amount still due for each watched purchase;
-- possible links for unlinked refund credits.
+Open [MoneyTrail](http://127.0.0.1:8001) in your browser. Keep the terminal running; Ctrl+C stops the server. If the port is busy, run `python app.py --port 8002` and use the address it prints. Opening `index.html` directly or using a plain static server will not run the app.
 
-The `kind` and purchase `category` columns are entered manually for now. The category breakdown shows purchases before refunds. Refund links are also entered manually. All rows are synthetic; no bank login or personal statement is needed.
+## What works
 
-## Fill in missing categories
+- Import a transaction CSV and switch between saved imports.
+- See purchases, refund credits, net spending, and refunds still due.
+- See spending by category, search transactions, and filter by transaction type.
+- Accept a category suggestion or enter your own category.
+- Mark a purchase as expecting a full or partial refund.
+- Review suggested refund links, choose a purchase manually, or undo a link.
+- Download a CSV containing your reviewed categories and refund links.
 
-You can leave a purchase's `category` field blank. It will count under **Uncategorized** until you enter a category yourself. The script uses a short keyword list to suggest Food, Transport, or Shopping. It matches whole words without caring about capital letters. If a description matches two categories or none, it asks you to choose instead.
+Edits are saved in `data/moneytrail.db`, a local SQLite database excluded from Git. Reloading the page or restarting the server keeps your work. The original CSV is not changed. Reimporting the same original transaction data reopens its saved workspace, including edits; a different import gets a separate workspace. Links stay within one import, so include the purchase and its later refund in the same CSV.
 
-Try `python main.py examples/uncategorized.csv`. It suggests Food for the campus cafe, Transport for the metro card, and Shopping for the bookstore. The local shop has no suggestion. Enter your choices in the CSV's `category` column and rerun to see the spending split. You can use your own category names, and entered categories take priority over suggestions.
+## Try the demo
 
-## Track a refund
+Click **Load student demo**. All of its transactions are synthetic.
 
-Each transaction has a unique `id`. To watch a purchase, enter the amount you expect back in its `refund_expected` field. Leave this blank for purchases you are not tracking. This can be less than the purchase price if you returned only part of an order.
+1. It starts with INR 4,480 in purchases, INR 1,200 in refund credits, and INR 3,280 in net spending. A card-bill payment is excluded from spending.
+2. The bookstore purchase expects INR 1,200 back, with INR 900 already linked. Confirm the suggested INR 300 credit: the bookstore status changes to **Received**, and total refunds still due drops from INR 2,100 to INR 1,800.
+3. Net spending stays INR 3,280 because that credit was already in the statement. Confirming its link only changes the watchlist.
+4. Click **Use Food** for the Swiggy purchase. Its INR 320 moves from Uncategorized to Food.
+5. Use **Edit** to enter another category or expected refund amount. Refresh to check the saved result, then download the reviewed CSV.
 
-When a refund credit appears, add it as a separate transaction with `kind` set to `refund` and a positive amount. Set its `refund_for` field to the original purchase's ID after checking that the credit belongs to that purchase. Leave `refund_for` blank if you have not confirmed the link.
+The demo is saved too. Loading it again reopens your edited copy.
 
-In the sample, purchase `t3` expects INR 1,200 back. Credit `t5` links to `t3` and accounts for INR 900, so the watchlist shows **Partly received**, with **INR 300 still due**. Multiple credits can link to the same purchase. The status becomes **Received** once their total reaches the expected amount.
+## CSV format
 
-Expected refunds do not reduce net spending. Only actual refund rows do, including credits that have not been linked yet. The watchlist counts only explicitly linked credits. If linked credits exceed the expected amount, the received total shows the full amount and the remaining amount stays at zero.
+Use UTF-8 text, dates like `2026-09-05`, and these columns:
 
-## Check a suggested link
+```csv
+id,date,description,amount,account,kind,category,refund_expected,refund_for
+p1,2026-09-05,BOOKSTORE ONLINE,-1200.00,Card,purchase,Shopping,1200.00,
+r1,2026-09-12,BOOKSTORE PARTIAL REFUND,900.00,Card,refund,,,p1
+r2,2026-09-15,BOOKSTORE FINAL REFUND,300.00,Card,refund,,,
+```
 
-The script suggests a link only when an unlinked refund and a watched purchase share a useful word in their descriptions, the refund is dated on or after the purchase, and its amount fits within what is still due. It ignores common words like `refund`, `card`, and `online`. This is only a clue: two purchases can both be suggested, and a real refund can have no shared words. Check your statement or order details before putting the purchase ID in `refund_for`.
+Each transaction needs a unique ID within its file. Purchases have negative amounts, refunds have positive amounts, and `kind` is `purchase`, `refund`, or `transfer`. Money values support up to two decimal places and must be below one billion INR. The web importer accepts up to 2 MB and 10,000 rows. It validates the whole file before saving.
 
-Try the separate example with `python main.py examples/unlinked_refund.csv`. Purchase `p1` expects INR 1,200 back, and refund `r1` confirms INR 900. The last INR 300 is present as credit `r2`, but it has no confirmed link yet. The script suggests linking `r2` to `p1`. After checking the credit, enter `p1` in `r2`'s `refund_for` field and rerun to see **Received**. Both credits count in total refunds received even before you link them.
+Leave `category` blank to review it later. Leave `refund_expected` blank or use 0 if you are not tracking a refund. On a refund row, `refund_for` is the original purchase's ID; leave it blank until you confirm the link.
 
-## Run
+Bank exports may need their columns converted to this format first.
 
-Requires Python 3.10 or newer:
+## Calculation rules
+
+Purchases count as spending. Transfers such as card-bill payments do not. Actual refund credits reduce net spending whether or not they have been linked. An expected refund never reduces spending on its own.
+
+The watchlist uses only confirmed links. It supports several credits for one purchase, and partial returns where the expected refund is smaller than the purchase price. If linked credits exceed the expected refund, the full received amount is shown and the amount still due stays at zero.
+
+Category suggestions use a small keyword list. Ambiguous or unknown descriptions remain Uncategorized until reviewed. Refund suggestions need a shared description word, a refund date on or after the purchase, and an amount no larger than what is still due. These clues can miss a real match or suggest the wrong purchase; the user makes the final choice.
+
+## How the code fits together
+
+| File | Job |
+| --- | --- |
+| `main.py` | Parse CSVs and calculate totals, categories, watchlists, and suggestions |
+| `app.py` | Serve the local API and save imports and edits in SQLite |
+| `app.js` | Load API results and handle browser actions |
+| `index.html`, `style.css` | Page structure and appearance |
+| `test_main.py`, `test_app.py` | Calculation, command-line, storage, and API checks |
+
+The browser asks Python for the report. Saving an edit validates it, writes it to SQLite, and recalculates the report. Money calculations use Python's `Decimal`. If two tabs edit the same import, a stale save is rejected so it cannot quietly overwrite a newer edit.
+
+## Terminal version
+
+The original terminal report still works:
 
 ```powershell
 python main.py
-```
-
-To read another file, pass its path. Put quotes around paths containing spaces:
-
-```powershell
 python main.py examples/unlinked_refund.csv
+python main.py examples/uncategorized.csv
 python main.py "D:\statements\october transactions.csv"
 python main.py --help
 ```
 
-Files must use the same columns as `sample_transactions.csv`, UTF-8 text, and dates like `2026-09-05`. Direct bank exports may need their columns converted first. Relative paths start from your terminal's current folder. The script reads the file without changing it and reports missing files or invalid rows as an error.
+This command reads a CSV without changing it. It does not read edits saved in the web app unless you download the reviewed CSV and pass that file.
 
-Open `index.html` in a browser to see the UI sketch.
-
-Run the checks with:
+## Checks
 
 ```powershell
 python -m unittest -v
 ```
 
-## Planned next steps
+Tests use temporary databases and synthetic data. They cover partial refunds, duplicate imports, persistence, invalid updates, stale edits, CSV export, and the HTTP API.
 
-Connect the browser interface to the calculations, with the UI design decided separately.
+## Current scope
 
-I'm adding these pieces one at a time so the calculations stay easy to check.
+This is a local app for one person, bound to 127.0.0.1. It has no bank connection, login system, or public hosting. Imports are separate workspaces rather than a combined account history. The interface is a working starting point; the visual design is still being developed.

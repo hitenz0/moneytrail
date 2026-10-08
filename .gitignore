@@ -1,2 +1,5 @@
 __pycache__/
 *.db
+data/
+*.db-shm
+*.db-wal

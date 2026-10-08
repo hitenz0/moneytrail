@@ -1,0 +1,12 @@
+id,date,description,amount,account,kind,category,refund_expected,refund_for
+d1,2026-09-02,UPI CAMPUS CAFE,-240.00,Bank,purchase,Food,,
+d2,2026-09-03,UPI METRO CARD,-500.00,Bank,purchase,Transport,,
+d3,2026-09-05,BOOKSTORE ONLINE,-1200.00,Card,purchase,Shopping,1200.00,
+d4,2026-09-06,UPI SWIGGY,-320.00,Bank,purchase,,,
+d5,2026-09-08,ONLINE HEADPHONES,-1800.00,Card,purchase,Shopping,1800.00,
+d6,2026-09-09,LOCAL STATIONERY,-150.00,Bank,purchase,,,
+d7,2026-09-10,CARD BILL PAYMENT,-3000.00,Bank,transfer,,,
+d8,2026-09-12,BOOKSTORE PARTIAL REFUND,900.00,Card,refund,,,d3
+d9,2026-09-15,BOOKSTORE FINAL REFUND,300.00,Card,refund,,,
+d10,2026-09-17,UPI UBER,-180.00,Bank,purchase,Transport,,
+d11,2026-09-19,COLLEGE PRINTING,-90.00,Bank,purchase,Study,,

@@ -3,104 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MoneyTrail</title>
-    <style>
-        * { box-sizing: border-box; }
-
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            color: #20302b;
-            background: #f4f6f2;
-        }
-
-        header {
-            padding: 24px;
-            color: white;
-            background: #173f32;
-        }
-
-        header h1 { margin: 0 0 6px; }
-        header p { margin: 0; color: #d6e6dc; }
-
-        main {
-            max-width: 1000px;
-            margin: 30px auto;
-            padding: 0 18px;
-        }
-
-        .note { color: #5b6d63; }
-
-        .cards {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 14px;
-            margin: 22px 0;
-        }
-
-        .card, section {
-            padding: 20px;
-            border: 1px solid #dce5dd;
-            border-radius: 12px;
-            background: white;
-        }
-
-        .card span { color: #63756a; }
-        .card strong { display: block; margin-top: 10px; font-size: 27px; }
-        section { margin-bottom: 18px; }
-        section h2 { margin: 0 0 15px; font-size: 20px; }
-
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 11px 6px; border-bottom: 1px solid #e8eee8; text-align: left; }
-        th:last-child, td:last-child { text-align: right; }
-        th { color: #63756a; font-size: 13px; }
-        .table-wrap { overflow-x: auto; }
-        .refund { color: #14794d; }
-        .waiting { color: #996a1e; font-weight: bold; }
-
-        @media (max-width: 650px) {
-            .cards { grid-template-columns: 1fr; }
-            table { min-width: 540px; }
-        }
-    </style>
+    <title>MoneyTrail — spending & refunds</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/app.js" defer></script>
 </head>
 <body>
     <header>
-        <h1>MoneyTrail</h1>
-        <p>Where did my money go? Did that refund come back?</p>
-    </header>
-
-    <main>
-        <h2>Spending overview</h2>
-        <p class="note">Sample data for now. The page is a UI sketch; it does not read the CSV yet.</p>
-
-        <div class="cards">
-            <div class="card"><span>Purchases</span><strong>₹1,940</strong></div>
-            <div class="card"><span>Refunds received</span><strong>₹900</strong></div>
-            <div class="card"><span>Net spending</span><strong>₹1,040</strong></div>
+        <div class="header-inner">
+            <div><p class="eyebrow">YOUR MONEY, ACCOUNTED FOR</p><h1>MoneyTrail<span class="brand-dot">.</span></h1></div>
+            <div class="header-copy">Where did my money go?<br>Did that refund come back?</div>
         </div>
-
-        <section>
-            <h2>Refund to check</h2>
-            <p><strong>Bookstore Online</strong> · ₹1,200 purchase</p>
-            <p>₹900 received <span class="waiting">· ₹300 still expected</span></p>
+    </header>
+    <main>
+        <div class="workspace-bar">
+            <div><label for="dataset">Your saved imports</label><select id="dataset"><option value="">No imports yet</option></select></div>
+            <div class="actions"><button id="demo" class="secondary">Load student demo</button><button id="import">Import CSV</button></div>
+            <input type="file" id="file" accept=".csv,text/csv" hidden>
+        </div>
+        <div id="notice" role="status" hidden></div>
+        <noscript><p class="notice error">Enable JavaScript to use MoneyTrail.</p></noscript>
+        <section id="empty" class="empty-panel">
+            <span class="tag">START HERE</span><h2>Follow your spending. Close the loop on refunds.</h2>
+            <p>Import a transaction CSV or load the student demo to try a partial refund, an unlinked credit, and purchases waiting for categories.</p>
+            <p class="note">Imports and edits are saved on this computer. Each file has its own workspace.</p>
         </section>
-
-        <section>
-            <h2>Recent transactions</h2>
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>Date</th><th>What</th><th>Account</th><th>Amount</th></tr></thead>
-                    <tbody>
-                        <tr><td>12 Sep</td><td>Bookstore partial refund</td><td>Card</td><td class="refund">+₹900</td></tr>
-                        <tr><td>10 Sep</td><td>Card bill payment</td><td>Bank</td><td>−₹1,200</td></tr>
-                        <tr><td>5 Sep</td><td>Bookstore Online</td><td>Card</td><td>−₹1,200</td></tr>
-                        <tr><td>3 Sep</td><td>Metro card</td><td>Bank</td><td>−₹500</td></tr>
-                        <tr><td>2 Sep</td><td>Campus cafe</td><td>Bank</td><td>−₹240</td></tr>
-                    </tbody>
-                </table>
+        <div id="dashboard" hidden>
+            <div class="section-heading"><div><p class="eyebrow">SPENDING OVERVIEW</p><h2 id="dataset-name"></h2><p id="dataset-meta" class="note"></p></div><a id="export" class="button secondary" href="#">Download reviewed CSV</a></div>
+            <div class="cards">
+                <div class="card"><span>Purchases</span><strong id="purchases">—</strong><small>Card bills excluded</small></div>
+                <div class="card"><span>Refund credits</span><strong id="refunds">—</strong><small>All credits in this import</small></div>
+                <div class="card"><span>Net spending</span><strong id="net">—</strong><small>Purchases minus refund credits</small></div>
+                <div class="card due-card"><span>Refunds still due</span><strong id="still-due">—</strong><small>Expected minus confirmed links</small></div>
             </div>
-        </section>
+            <div class="columns">
+                <section><div class="section-heading"><h2>Where it went</h2><span class="tag">BEFORE REFUNDS</span></div><div id="categories"></div><p class="note small">Blank categories stay uncategorized until you choose one.</p></section>
+                <section><div class="section-heading"><h2>Refund watchlist</h2><span class="tag" id="watch-count"></span></div><div id="watchlist"></div></section>
+            </div>
+            <section><div class="section-heading"><div><h2>Refunds to review</h2><p class="note">Check the credit against your order before confirming a link.</p></div><span class="tag" id="review-count"></span></div><div id="refund-review"></div></section>
+            <section>
+                <div class="section-heading"><div><h2>Transactions</h2><p class="note" id="transaction-count"></p></div></div>
+                <div class="filters"><label>Search<input id="search" type="search" placeholder="Merchant, account, category or ID"></label><label>Transaction type<select id="kind"><option value="">All types</option><option value="purchase">Purchases</option><option value="refund">Refunds</option><option value="transfer">Transfers</option></select></label></div>
+                <div class="table-wrap"><table><thead><tr><th>Date / ID</th><th>Description</th><th>Account</th><th>Category / link</th><th class="amount">Amount</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody id="transactions"></tbody></table></div>
+                <p class="note small">Search and type filters apply to this table. Overview totals cover the full import.</p>
+            </section>
+        </div>
+        <details class="format-help"><summary>CSV format and how imports work</summary><p>Use UTF-8 text with these columns:</p><code>id,date,description,amount,account,kind,category,refund_expected,refund_for</code><p>Use dates like 2026-09-05. Purchases have negative amounts; refunds have positive amounts. Kind is purchase, refund, or transfer. Category, refund_expected, and refund_for can be blank. Limit: 2 MB and 10,000 rows.</p><p>Reimporting the same original file reopens its saved workspace. Your original CSV stays as it was; download the reviewed CSV to keep your edits in a file. Bank exports may need their columns converted first.</p></details>
+        <footer>MoneyTrail <span>Built a little at a time.</span></footer>
     </main>
+    <dialog id="edit-dialog">
+        <form id="edit-form">
+            <div class="section-heading"><h2 id="edit-title">Edit transaction</h2><button type="button" id="close-dialog" class="icon-button" aria-label="Close edit dialog">×</button></div>
+            <p id="edit-description"></p><p id="edit-details" class="note"></p>
+            <div id="purchase-fields"><label>Category<input id="edit-category" maxlength="200" list="category-options" placeholder="Choose or type a category"></label><datalist id="category-options"><option value="Food"><option value="Transport"><option value="Shopping"><option value="Study"><option value="Subscriptions"></datalist><label>Expected refund (INR)<input id="edit-expected" type="number" min="0" step="0.01" required></label><p class="note small">Enter the amount you expect back. Use 0 when you are not tracking a refund.</p></div>
+            <div id="refund-fields"><label>This refund belongs to<select id="edit-link"></select></label><p class="note small">Choose Unlinked to undo a link. A confirmed link counts toward that purchase's refund watchlist.</p></div>
+            <p id="edit-error" class="error" role="alert" hidden></p>
+            <div class="dialog-actions"><button type="button" id="cancel-dialog" class="secondary">Cancel</button><button type="submit">Save changes</button></div>
+        </form>
+    </dialog>
 </body>
 </html>
