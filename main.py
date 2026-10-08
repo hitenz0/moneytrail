@@ -1,12 +1,15 @@
 """Read sample transactions and show MoneyTrail spending totals."""
 
 import csv
+import re
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 
 FILE = Path(__file__).with_name("sample_transactions.csv")
 KINDS = {"purchase", "refund", "transfer"}
+COMMON_WORDS = {"card", "credit", "online", "partial", "payment", "refund", "return", "upi"}
 
 
 def load_transactions(path):
@@ -24,6 +27,7 @@ def load_transactions(path):
                 if any(row[column] is None for column in expected):
                     raise ValueError("missing CSV fields")
                 transaction_id = row["id"].strip()
+                transaction_date = date.fromisoformat(row["date"].strip()).isoformat()
                 amount = Decimal(row["amount"])
                 kind = row["kind"].strip().lower()
                 category = row["category"].strip()
@@ -50,7 +54,8 @@ def load_transactions(path):
             except (ValueError, TypeError, InvalidOperation) as error:
                 raise ValueError(f"Line {line_number}: {error}") from error
             seen_ids.add(transaction_id)
-            transactions.append({**row, "id": transaction_id, "amount": amount, "kind": kind,
+            transactions.append({**row, "id": transaction_id, "date": transaction_date,
+                                 "amount": amount, "kind": kind,
                                  "category": category, "refund_expected": refund_expected,
                                  "refund_for": refund_for})
 
@@ -101,6 +106,31 @@ def refund_watchlist(transactions):
     return watchlist
 
 
+def description_words(description):
+    words = re.findall(r"[a-z0-9]+", description.lower())
+    return {word for word in words if len(word) >= 4 and word not in COMMON_WORDS}
+
+
+def suggest_refund_links(transactions):
+    purchases = {row["id"]: row for row in transactions if row["kind"] == "purchase"}
+    waiting = [item for item in refund_watchlist(transactions) if item["remaining"] > 0]
+    suggestions = []
+
+    for refund in transactions:
+        if refund["kind"] != "refund" or refund["refund_for"]:
+            continue
+        refund_words = description_words(refund["description"])
+        for item in waiting:
+            purchase = purchases[item["id"]]
+            shared_words = refund_words & description_words(purchase["description"])
+            if (refund["date"] >= purchase["date"] and
+                    refund["amount"] <= item["remaining"] and shared_words):
+                suggestions.append({"refund_id": refund["id"], "purchase_id": purchase["id"],
+                                    "amount": refund["amount"], "shared_words": sorted(shared_words)})
+
+    return suggestions
+
+
 if __name__ == "__main__":
     rows = load_transactions(FILE)
     gross, refunds, net = summarize(rows)
@@ -122,3 +152,12 @@ if __name__ == "__main__":
               f" | Still due: INR {item['remaining']:,.2f}")
     total_due = sum((item["remaining"] for item in watchlist), Decimal(0))
     print(f"Total refunds still due: INR {total_due:,.2f}")
+
+    print("\nPossible refund links (check before confirming):")
+    suggestions = suggest_refund_links(rows)
+    if not suggestions:
+        print("  No suggestions from unlinked refund credits.")
+    for item in suggestions:
+        print(f"  Refund {item['refund_id']} (INR {item['amount']:,.2f})"
+              f" might belong to purchase {item['purchase_id']}"
+              f" - shared word: {', '.join(item['shared_words'])}")

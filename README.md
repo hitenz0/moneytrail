@@ -4,7 +4,7 @@ I use UPI and a credit card, and it can be hard to see where small spends went o
 
 The project will grow in small steps. The Python script reads a simple CSV of sample transactions and calculates spending. `index.html` is an early UI sketch using the same sample numbers. The page is static for now; it does not read the CSV yet.
 
-## Current milestone: refund watchlist
+## Current milestone: possible refund links
 
 `main.py` loads `sample_transactions.csv` and reports:
 
@@ -12,9 +12,10 @@ The project will grow in small steps. The Python script reads a simple CSV of sa
 - confirmed refund credits, which reduce net spending;
 - transfers, such as paying a credit-card bill, which are not another purchase;
 - purchases grouped by a category you enter in the CSV;
-- expected refunds, linked credits, and the amount still due for each watched purchase.
+- expected refunds, linked credits, and the amount still due for each watched purchase;
+- possible links for unlinked refund credits.
 
-The `kind` and purchase `category` columns are entered manually for now. The category breakdown shows purchases before refunds. Refund links are also entered manually; there is no automatic matching yet. All rows are synthetic; no bank login or personal statement is needed.
+The `kind` and purchase `category` columns are entered manually for now. The category breakdown shows purchases before refunds. Refund links are also entered manually. All rows are synthetic; no bank login or personal statement is needed.
 
 ## Track a refund
 
@@ -25,6 +26,12 @@ When a refund credit appears, add it as a separate transaction with `kind` set t
 In the sample, purchase `t3` expects INR 1,200 back. Credit `t5` links to `t3` and accounts for INR 900, so the watchlist shows **Partly received**, with **INR 300 still due**. Multiple credits can link to the same purchase. The status becomes **Received** once their total reaches the expected amount.
 
 Expected refunds do not reduce net spending. Only actual refund rows do, including credits that have not been linked yet. The watchlist counts only explicitly linked credits. If linked credits exceed the expected amount, the received total shows the full amount and the remaining amount stays at zero.
+
+## Check a suggested link
+
+The script suggests a link only when an unlinked refund and a watched purchase share a useful word in their descriptions, the refund is dated on or after the purchase, and its amount fits within what is still due. It ignores common words like `refund`, `card`, and `online`. This is only a clue: two purchases can both be suggested, and a real refund can have no shared words. Check your statement or order details before putting the purchase ID in `refund_for`.
+
+To try it with the sample data, clear `t3` from transaction `t5`'s `refund_for` field, run `python main.py`, then restore the link. You should see `t5` suggested for `t3` because both descriptions contain `BOOKSTORE`. While the field is blank, the INR 900 still counts in total refunds received, but the watchlist shows the full INR 1,200 as still due.
 
 ## Run
 
@@ -45,7 +52,6 @@ python -m unittest -v
 ## Planned next steps
 
 1. Let the user correct a suggested category instead of entering every category manually.
-2. Suggest possible refund credits from a later statement; require user confirmation.
-3. Connect the browser interface to the calculations once the rules are trustworthy.
+2. Connect the browser interface to the calculations once the rules are trustworthy.
 
 I'm adding these pieces one at a time so the calculations stay easy to check.

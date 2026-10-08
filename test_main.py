@@ -4,7 +4,7 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 
-from main import FILE, load_transactions, refund_watchlist, summarize
+from main import FILE, load_transactions, refund_watchlist, suggest_refund_links, summarize
 
 
 class RefundWatchlistTests(unittest.TestCase):
@@ -83,6 +83,44 @@ class RefundWatchlistTests(unittest.TestCase):
         first, second = refund_watchlist(self.load_rows())
         self.assertEqual(first["remaining"], Decimal("240"))
         self.assertEqual(second["remaining"], Decimal("300"))
+
+    def test_unlinked_bookstore_credit_is_only_a_suggestion(self):
+        self.rows[4]["refund_for"] = ""
+        transactions = self.load_rows()
+        suggestions = suggest_refund_links(transactions)
+        self.assertEqual(len(suggestions), 1)
+        self.assertEqual((suggestions[0]["refund_id"], suggestions[0]["purchase_id"]), ("t5", "t3"))
+        self.assertEqual(suggestions[0]["shared_words"], ["bookstore"])
+        self.assertEqual(refund_watchlist(transactions)[0]["remaining"], Decimal("1200"))
+
+    def test_confirmed_credit_is_not_suggested(self):
+        self.assertEqual(suggest_refund_links(self.load_rows()), [])
+
+    def test_suggestion_needs_description_date_and_amount(self):
+        original = self.rows[4].copy()
+        changes = (
+            {"description": "CARD REFUND"},
+            {"date": "2026-09-04"},
+            {"amount": "1200.01"},
+        )
+        for change in changes:
+            with self.subTest(change=change):
+                self.rows[4] = {**original, **change, "refund_for": ""}
+                self.assertEqual(suggest_refund_links(self.load_rows()), [])
+        self.rows[4] = original
+
+    def test_multiple_purchases_can_be_suggested_for_review(self):
+        self.rows[0]["description"] = "BOOKSTORE CAFE"
+        self.rows[0]["refund_expected"] = "240.00"
+        self.rows[4]["refund_for"] = ""
+        self.rows[4]["amount"] = "200.00"
+        self.assertEqual([item["purchase_id"] for item in suggest_refund_links(self.load_rows())],
+                         ["t1", "t3"])
+
+    def test_reject_invalid_date(self):
+        self.rows[4]["date"] = "2026-09-99"
+        with self.assertRaisesRegex(ValueError, "Line 6"):
+            self.load_rows()
 
 
 if __name__ == "__main__":
