@@ -11,11 +11,12 @@ class Element {
         this.value = '';
         this.style = {};
         this.listeners = {};
+        this.attributes = {};
     }
     append(...nodes) { this.children.push(...nodes); }
     replaceChildren(...nodes) { this.children = nodes; }
     addEventListener(name, handler) { this.listeners[name] = handler; }
-    setAttribute() {}
+    setAttribute(name, value) { this.attributes[name] = value; }
     showModal() { this.open = true; }
     close() { this.open = false; }
 }
@@ -44,7 +45,61 @@ const context = vm.createContext({
 });
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8'), context);
 
+function themeSession(saved, darkSystem = false, blockedStorage = false) {
+    const root = {dataset: {}};
+    const buttons = ['light', 'dark'].map((theme) => {
+        const button = new Element();
+        button.dataset = {themeChoice: theme};
+        return button;
+    });
+    let mounted = false;
+    let ready;
+    let systemChanged;
+    const storage = {value: saved};
+    const system = {matches: darkSystem, addEventListener(name, handler) { systemChanged = handler; }};
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, 'theme.js'), 'utf8'), {
+        window: {matchMedia() { return system; }},
+        document: {
+            documentElement: root,
+            querySelectorAll() { return mounted ? buttons : []; },
+            addEventListener(name, handler) { ready = handler; },
+        },
+        localStorage: {
+            getItem() { if (blockedStorage) throw new Error('Storage blocked'); return storage.value; },
+            setItem(key, value) { if (blockedStorage) throw new Error('Storage blocked'); storage.value = value; },
+        },
+    });
+    const initial = root.dataset.theme;
+    mounted = true;
+    ready();
+    return {root, buttons, storage, initial, systemChange(dark) { system.matches = dark; systemChanged(); }};
+}
+
+function checkThemes() {
+    const automatic = themeSession(null, true);
+    assert.equal(automatic.initial, 'dark'); // Applied before page controls exist.
+    assert.equal(automatic.buttons[1].attributes['aria-pressed'], 'true');
+    automatic.systemChange(false);
+    assert.equal(automatic.root.dataset.theme, 'light');
+    automatic.buttons[1].listeners.click();
+    assert.equal(automatic.root.dataset.theme, 'dark');
+    assert.equal(automatic.storage.value, 'dark');
+    assert.equal(automatic.buttons[0].attributes['aria-pressed'], 'false');
+    automatic.systemChange(false);
+    assert.equal(automatic.root.dataset.theme, 'dark'); // Manual choice wins.
+    assert.equal(themeSession(automatic.storage.value, false).initial, 'dark');
+    const light = themeSession('light', true);
+    assert.equal(light.initial, 'light');
+    assert.equal(themeSession('invalid', true).initial, 'dark');
+    const blocked = themeSession(null, false, true);
+    blocked.buttons[1].listeners.click();
+    assert.equal(blocked.root.dataset.theme, 'dark');
+    blocked.buttons[0].listeners.click();
+    assert.equal(blocked.root.dataset.theme, 'light');
+}
+
 async function main() {
+    checkThemes();
     await new Promise(setImmediate); // Let the initial state request finish.
     const timing = (due, remaining = '300') => context.refundTiming({refund_due: due, remaining});
     assert.equal(timing('').overdue, false);
@@ -103,7 +158,7 @@ async function main() {
     assert.equal(posts[0].changes.refund_due, '2026-10-12');
     assert.equal(posts[0].changes.refund_note, 'Merchant extended the date');
     assert.equal(elements['edit-dialog'].open, false);
-    console.log('Frontend checks passed: dates, partial/complete refunds, filter, notes, edit form, and save payload.');
+    console.log('Frontend checks passed: theme switching/persistence, dates, refunds, filter, notes, edit form, and save payload.');
 }
 
 module.exports = main();

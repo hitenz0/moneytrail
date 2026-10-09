@@ -14,6 +14,7 @@ Open [MoneyTrail](http://127.0.0.1:8001) in your browser. Keep the terminal runn
 
 ## What works
 
+- Switch between light and dark mode in the header. The app starts with your device's theme and remembers your choice in this browser.
 - Import a transaction CSV and switch between saved imports.
 - See purchases, refund credits, net spending, and refunds still due.
 - See spending by category, search transactions, and filter by transaction type.
@@ -101,7 +102,7 @@ python -m unittest -v
 
 Tests use temporary databases and synthetic data. They cover partial refunds, duplicate imports, persistence, invalid updates, stale edits, CSV export, and the HTTP API.
 
-If Node.js is available, run `node test_frontend.cjs` for the date labels, overdue filter, and edit-form checks. These use a small simulated DOM; they do not replace a visual browser check. The app itself still only requires Python.
+If Node.js is available, run `node test_frontend.cjs` for theme switching and persistence, date labels, the overdue filter, and edit-form checks. These use a small simulated DOM; they do not replace a visual browser check. The app itself still only requires Python.
 
 ## Current scope
 

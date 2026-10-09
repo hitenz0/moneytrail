@@ -46,12 +46,12 @@ async function request(path, body) {
 async function action(work) {
     if (busy) return;
     busy = true;
-    document.querySelectorAll("button, input, select, textarea").forEach((node) => node.disabled = true);
+    document.querySelectorAll("button:not([data-theme-choice]), input, select, textarea").forEach((node) => node.disabled = true);
     try { await work(); }
     catch (error) { notice(error.message, true); }
     finally {
         busy = false;
-        document.querySelectorAll("button, input, select, textarea").forEach((node) => node.disabled = false);
+        document.querySelectorAll("button:not([data-theme-choice]), input, select, textarea").forEach((node) => node.disabled = false);
     }
 }
 

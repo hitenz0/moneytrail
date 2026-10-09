@@ -229,6 +229,14 @@ class WebTests(unittest.TestCase):
         self.assertIn("columns", error["error"])
         self.assertEqual(len(self.request("/api/state")[1]["datasets"]), 1)
 
+    def test_theme_script_is_served_and_loads_before_styles(self):
+        status, script = self.request("/theme.js")
+        self.assertEqual(status, 200)
+        self.assertIn("moneytrail-theme", script)
+        _, page = self.request("/")
+        self.assertLess(page.index('src="/theme.js"'), page.index('href="/style.css"'))
+        self.assertIn('data-theme-choice="dark"', page)
+
     def test_followup_api_and_export(self):
         _, loaded = self.request("/api/demo", {})
         dataset = loaded["report"]["dataset"]

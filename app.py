@@ -188,7 +188,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         url = urlparse(self.path)
         static = {"/": ("index.html", "text/html"), "/index.html": ("index.html", "text/html"),
-                  "/app.js": ("app.js", "text/javascript"), "/style.css": ("style.css", "text/css")}
+                  "/app.js": ("app.js", "text/javascript"), "/theme.js": ("theme.js", "text/javascript"),
+                  "/style.css": ("style.css", "text/css")}
         if url.path in static:
             name, content_type = static[url.path]
             self.send(200, (ROOT / name).read_bytes(), content_type + "; charset=utf-8")

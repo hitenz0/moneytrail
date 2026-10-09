@@ -4,17 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MoneyTrail — spending & refunds</title>
+    <script src="/theme.js"></script>
     <link rel="stylesheet" href="/style.css">
     <script src="/app.js" defer></script>
 </head>
 <body>
     <header>
         <div class="header-inner">
-            <div><p class="eyebrow">YOUR MONEY, ACCOUNTED FOR</p><h1>MoneyTrail<span class="brand-dot">.</span></h1></div>
-            <div class="header-copy">Where did my money go?<br>Did that refund come back?</div>
+            <div class="brand"><span class="brand-mark" aria-hidden="true">↗</span><div><h1>MoneyTrail<span class="brand-dot">.</span></h1><p class="brand-caption">SPENDING &amp; REFUNDS</p></div></div>
+            <div class="header-actions"><span class="local-badge"><span aria-hidden="true"></span>Saved locally</span><div class="theme-switch" role="group" aria-label="Color theme">
+                <button type="button" data-theme-choice="light" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>Light</button>
+                <button type="button" data-theme-choice="dark" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20.5 14.2A8.6 8.6 0 0 1 9.8 3.5 8.6 8.6 0 1 0 20.5 14.2Z"/></svg>Dark</button>
+            </div></div>
         </div>
     </header>
     <main>
+        <div class="page-intro"><p class="eyebrow">YOUR MONEY, ACCOUNTED FOR</p><h2>Your money, at a glance.</h2><p class="note">Follow your spending. Keep track of what comes back.</p></div>
         <div class="workspace-bar">
             <div><label for="dataset">Saved imports</label><select id="dataset"><option value="">No imports yet</option></select></div>
             <div class="actions"><button id="demo" class="secondary">Load student demo</button><button id="import">Import CSV</button></div>
@@ -30,10 +35,10 @@
         <div id="dashboard" hidden>
             <div class="section-heading"><div><p class="eyebrow">SPENDING OVERVIEW</p><h2 id="dataset-name"></h2><p id="dataset-meta" class="note"></p></div><a id="export" class="button secondary" href="#">Download reviewed CSV</a></div>
             <div class="cards">
-                <div class="card"><span>Purchases</span><strong id="purchases">—</strong><small>Transfers and card-bill payments excluded</small></div>
-                <div class="card"><span>Refund credits</span><strong id="refunds">—</strong><small>All refunds in this import</small></div>
-                <div class="card"><span>Net spending</span><strong id="net">—</strong><small>Purchases minus refund credits</small></div>
-                <div class="card due-card"><span>Refunds still due</span><strong id="still-due">—</strong><small>Expected refunds still outstanding</small></div>
+                <div class="card"><div class="card-label"><span>Purchases</span><span class="stat-icon" aria-hidden="true">↗</span></div><strong id="purchases">—</strong><small>Transfers and card-bill payments excluded</small></div>
+                <div class="card"><div class="card-label"><span>Refund credits</span><span class="stat-icon" aria-hidden="true">↙</span></div><strong id="refunds">—</strong><small>All refunds in this import</small></div>
+                <div class="card net-card"><div class="card-label"><span>Net spending</span><span class="stat-icon" aria-hidden="true">=</span></div><strong id="net">—</strong><small>Purchases minus refund credits</small></div>
+                <div class="card due-card"><div class="card-label"><span>Refunds still due</span><span class="stat-icon" aria-hidden="true">◷</span></div><strong id="still-due">—</strong><small>Expected refunds still outstanding</small></div>
             </div>
             <div class="columns">
                 <section><div class="section-heading"><h2>Where it went</h2><span class="tag">BEFORE REFUNDS</span></div><div id="categories"></div><p class="note small">Choose categories for uncategorized purchases in the table below.</p></section>
