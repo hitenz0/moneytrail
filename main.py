@@ -12,6 +12,7 @@ from pathlib import Path
 FILE = Path(__file__).with_name("sample_transactions.csv")
 FIELDS = ["id", "date", "description", "amount", "account", "kind", "category",
           "refund_expected", "refund_for"]
+FOLLOWUP_FIELDS = ["refund_due", "refund_note"]
 KINDS = {"purchase", "refund", "transfer"}
 COMMON_WORDS = {"card", "credit", "online", "partial", "payment", "refund", "return", "upi"}
 CATEGORY_WORDS = {
@@ -50,6 +51,18 @@ def parse_transactions(text):
             category = row["category"].strip()
             refund_expected = Decimal(row["refund_expected"].strip() or "0")
             refund_for = row["refund_for"].strip()
+            refund_due = (row.get("refund_due") or "").strip()
+            refund_note = (row.get("refund_note") or "").strip()
+            if refund_due:
+                if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", refund_due):
+                    raise ValueError("expected refund date must use YYYY-MM-DD")
+                refund_due = date.fromisoformat(refund_due).isoformat()
+                if refund_due < transaction_date:
+                    raise ValueError("expected refund date cannot be before the purchase")
+            if len(refund_note) > 200:
+                raise ValueError("refund note must be at most 200 characters")
+            if (refund_due or refund_note) and kind != "purchase":
+                raise ValueError("refund dates and notes belong to purchases only")
             if not transaction_id or transaction_id in seen_ids:
                 raise ValueError("each transaction needs a unique id")
             if not amount.is_finite():
@@ -76,7 +89,8 @@ def parse_transactions(text):
         transactions.append({**row, "id": transaction_id, "date": transaction_date,
                              "amount": amount, "kind": kind,
                              "category": category, "refund_expected": refund_expected,
-                             "refund_for": refund_for})
+                             "refund_for": refund_for, "refund_due": refund_due,
+                             "refund_note": refund_note})
 
     purchases = {row["id"]: row for row in transactions if row["kind"] == "purchase"}
     for row in transactions:
@@ -129,7 +143,9 @@ def refund_watchlist(transactions):
             status = "Waiting"
         watchlist.append({"id": row["id"], "description": row["description"],
                           "expected": row["refund_expected"], "received": paid_back,
-                          "remaining": remaining, "status": status})
+                          "remaining": remaining, "status": status,
+                          "refund_due": row.get("refund_due", ""),
+                          "refund_note": row.get("refund_note", "")})
     return watchlist
 
 

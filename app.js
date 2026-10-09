@@ -4,6 +4,7 @@ const money = (value) => currency.format(Number(value));
 let state = {datasets: [], report: null};
 let editing = null;
 let busy = false;
+let watchlistDay = "";
 
 function element(tag, text, className) {
     const node = document.createElement(tag);
@@ -45,12 +46,12 @@ async function request(path, body) {
 async function action(work) {
     if (busy) return;
     busy = true;
-    document.querySelectorAll("button, input, select").forEach((node) => node.disabled = true);
+    document.querySelectorAll("button, input, select, textarea").forEach((node) => node.disabled = true);
     try { await work(); }
     catch (error) { notice(error.message, true); }
     finally {
         busy = false;
-        document.querySelectorAll("button, input, select").forEach((node) => node.disabled = false);
+        document.querySelectorAll("button, input, select, textarea").forEach((node) => node.disabled = false);
     }
 }
 
@@ -65,7 +66,7 @@ async function save(row, changes) {
         dataset_id: state.report.dataset.id, version: state.report.dataset.version, id: row.id, changes
     });
     useState(data);
-    notice("Saved on this computer.");
+    notice("Changes saved on this computer.");
 }
 
 function render() {
@@ -106,12 +107,29 @@ function renderCategories() {
     });
 }
 
+function refundTiming(item, now = new Date()) {
+    if (!item.refund_due) return {overdue: false, label: "No expected date set"};
+    // Compare calendar days in the browser's timezone, without DST-length days.
+    const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    const due = new Date(item.refund_due + "T00:00:00Z");
+    const days = Math.round((today - due.getTime()) / 86400000);
+    const expected = "Expected " + new Intl.DateTimeFormat("en-IN", {day: "numeric", month: "short", year: "numeric", timeZone: "UTC"}).format(due);
+    const overdue = Number(item.remaining) > 0 && days > 0;
+    const suffix = overdue ? " · " + days + (days === 1 ? " day overdue" : " days overdue") :
+        Number(item.remaining) > 0 && days === 0 ? " · Due today" : "";
+    return {overdue, label: expected + suffix};
+}
+
 function renderWatchlist() {
+    watchlistDay = new Date().toDateString();
     const items = state.report.watchlist;
-    $("watch-count").textContent = items.filter((item) => Number(item.remaining) > 0).length + " OPEN";
+    const overdueCount = items.filter((item) => refundTiming(item).overdue).length;
+    $("watch-count").textContent = items.filter((item) => Number(item.remaining) > 0).length + " OPEN · " + overdueCount + " OVERDUE";
     $("watchlist").replaceChildren();
-    if (!items.length) $("watchlist").append(element("p", "No refunds being tracked. Edit a purchase below to enter the amount you expect back.", "note"));
-    items.forEach((item) => {
+    const overdueOnly = $("watch-filter").value === "overdue";
+    const visible = overdueOnly ? items.filter((item) => refundTiming(item).overdue) : items;
+    if (!visible.length) $("watchlist").append(element("p", overdueOnly ? "No overdue refunds. Choose All tracked refunds to see the full watchlist." : "Expecting a refund? Edit a purchase below and enter how much you expect back.", "note"));
+    visible.forEach((item) => {
         const block = element("div", undefined, "watch-item");
         const heading = element("div", undefined, "watch-heading");
         heading.append(element("strong", item.description), element("span", item.status, "status " + (item.status === "Received" ? "received" : "")));
@@ -122,8 +140,12 @@ function renderWatchlist() {
         fill.style.width = Math.min(100, Number(item.received) / Number(item.expected) * 100) + "%";
         track.append(fill);
         const actions = element("div", undefined, "watch-actions");
-        actions.append(button("Edit expected refund", () => openEdit(item.id)));
-        block.append(heading, amounts, track, actions);
+        actions.append(button("Edit refund details", () => openEdit(item.id)));
+        const timing = refundTiming(item);
+        const expected = element("p", timing.label, timing.overdue ? "refund-timing overdue" : "refund-timing note");
+        block.append(heading, expected, amounts, track);
+        if (item.refund_note) block.append(element("p", item.refund_note, "refund-note note small"));
+        block.append(actions);
         $("watchlist").append(block);
     });
 }
@@ -133,7 +155,7 @@ function renderReview() {
     const unlinked = rows.filter((row) => row.kind === "refund" && !row.refund_for);
     $("review-count").textContent = unlinked.length + " UNLINKED";
     $("refund-review").replaceChildren();
-    if (!unlinked.length) $("refund-review").append(element("p", "No unlinked refund credits to review.", "note"));
+    if (!unlinked.length) $("refund-review").append(element("p", "No refunds need linking in this import.", "note"));
     unlinked.forEach((row) => {
         const block = element("div", undefined, "review-item");
         const info = element("div");
@@ -147,8 +169,8 @@ function renderReview() {
             choice.append(element("p", "Shared word: " + item.shared_words.join(", ") + " · date and amount fit", "note"));
             options.append(choice);
         });
-        if (!suggestions.length) options.append(element("p", "No suggestion from the descriptions, dates, and amounts.", "note small"));
-        options.append(button("Choose a purchase manually", () => openEdit(row.id)));
+        if (!suggestions.length) options.append(element("p", "No suggested purchase. Choose one if you recognize this refund.", "note small"));
+        options.append(button("Choose a purchase", () => openEdit(row.id)));
         block.append(info, options);
         $("refund-review").append(block);
     });
@@ -165,7 +187,7 @@ function renderTransactions() {
     $("transactions").replaceChildren();
     if (!rows.length) {
         const row = element("tr");
-        const cell = element("td", "No transactions match these filters.", "note");
+        const cell = element("td", "No matching transactions. Try a different search or transaction type.", "note");
         cell.colSpan = 6;
         row.append(cell);
         $("transactions").append(row);
@@ -200,11 +222,15 @@ function openEdit(id) {
     $("edit-details").textContent = editing.date + " · " + editing.account + " · " + money(editing.amount) + " · " + editing.id;
     const purchase = editing.kind === "purchase";
     $("purchase-fields").hidden = !purchase;
+    $("followup-fields").hidden = !purchase;
     $("refund-fields").hidden = purchase;
     $("edit-expected").required = purchase;
     $("edit-expected").max = purchase ? String(-Number(editing.amount)) : "999999999.99";
     $("edit-expected").value = purchase ? editing.refund_expected : "0";
     $("edit-category").value = editing.category;
+    $("edit-due").min = purchase ? editing.date : "";
+    $("edit-due").value = purchase ? editing.refund_due || "" : "";
+    $("edit-note").value = purchase ? editing.refund_note || "" : "";
     $("edit-link").replaceChildren(new Option("Unlinked", ""));
     state.report.transactions.filter((row) => row.kind === "purchase" && row.date <= editing.date).forEach((row) => {
         $("edit-link").append(new Option(row.description + " · " + row.date + " · " + money(-Number(row.amount)) + " (" + row.id + ")", row.id));
@@ -216,7 +242,7 @@ function openEdit(id) {
 
 $("edit-form").addEventListener("submit", (event) => {
     event.preventDefault();
-    const changes = editing.kind === "purchase" ? {category: $("edit-category").value.trim(), refund_expected: $("edit-expected").value} : {refund_for: $("edit-link").value};
+    const changes = editing.kind === "purchase" ? {category: $("edit-category").value.trim(), refund_expected: $("edit-expected").value, refund_due: $("edit-due").value, refund_note: $("edit-note").value.trim()} : {refund_for: $("edit-link").value};
     action(async () => {
         try {
             await save(editing, changes);
@@ -231,6 +257,13 @@ $("close-dialog").addEventListener("click", () => $("edit-dialog").close());
 $("cancel-dialog").addEventListener("click", () => $("edit-dialog").close());
 $("search").addEventListener("input", renderTransactions);
 $("kind").addEventListener("change", renderTransactions);
+$("watch-filter").addEventListener("change", renderWatchlist);
+// Refresh overnight without rebuilding focused controls every minute.
+function refreshWatchlistDate() {
+    if (state.report && !document.hidden && watchlistDay !== new Date().toDateString()) renderWatchlist();
+}
+setInterval(refreshWatchlistDate, 60000);
+document.addEventListener("visibilitychange", refreshWatchlistDate);
 $("dataset").addEventListener("change", () => action(async () => {
     if (!$("dataset").value) return;
     useState(await request("/api/state?dataset=" + $("dataset").value));
@@ -238,7 +271,7 @@ $("dataset").addEventListener("change", () => action(async () => {
 }));
 $("demo").addEventListener("click", () => action(async () => {
     useState(await request("/api/demo", {}));
-    notice("Student demo loaded. Try confirming the bookstore refund or choosing a category.");
+    notice("Student demo opened. Explore the refund links and purchase categories below.");
 }));
 $("import").addEventListener("click", () => $("file").click());
 $("file").addEventListener("change", () => {

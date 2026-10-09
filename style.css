@@ -17,7 +17,8 @@ p { margin: 8px 0; }
 .workspace-bar { margin-bottom: 24px; align-items: end; }
 .workspace-bar select { min-width: 250px; max-width: 440px; }
 label { display: block; font-size: 12px; font-weight: 650; }
-input, select { display: block; width: 100%; font: inherit; padding: 10px 12px; margin-top: 6px; color: var(--ink); background: white; border: 1px solid #bac9be; border-radius: 7px; }
+input, select, textarea { display: block; width: 100%; font: inherit; padding: 10px 12px; margin-top: 6px; color: var(--ink); background: white; border: 1px solid #bac9be; border-radius: 7px; }
+textarea { resize: vertical; }
 button, .button { background: var(--green); color: white; font: inherit; font-weight: 600; border: 1px solid var(--green); border-radius: 7px; padding: 10px 15px; cursor: pointer; text-decoration: none; display: inline-block; text-align: center; }
 button:hover, .button:hover { background: #265843; }
 button.secondary, .button.secondary { background: white; color: var(--green); border-color: #c9d6cc; }
@@ -46,6 +47,11 @@ section { margin-bottom: 20px; }
 .status.received { background: #e4f3e8; color: #17683e; }
 .watch-amounts { display: flex; justify-content: space-between; font-size: 12px; margin: 8px 0; gap: 8px; }
 .watch-actions { margin-top: 10px; }
+.watch-filter { max-width: 230px; }
+#watchlist { margin-top: 18px; }
+.refund-timing { font-size: 12px; }
+.refund-timing.overdue { color: #9a3429; font-weight: 650; }
+.refund-note { white-space: pre-wrap; overflow-wrap: anywhere; border-left: 2px solid var(--line); padding-left: 10px; margin-top: 12px; }
 .review-item { display: flex; justify-content: space-between; gap: 20px; padding: 15px 0; align-items: center; border-top: 1px solid var(--line); }
 .review-item:first-child { border-top: 0; padding-top: 0; }
 .review-options { display: grid; gap: 8px; max-width: 400px; }

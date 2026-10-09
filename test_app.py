@@ -1,8 +1,11 @@
 import http.client
+import hashlib
 import json
+import sqlite3
 import tempfile
 import threading
 import unittest
+from contextlib import closing
 from decimal import Decimal
 from pathlib import Path
 
@@ -100,6 +103,76 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(next(row["category"] for row in rows if row["id"] == "d4"), "Food, campus")
         self.assertEqual(next(row["refund_for"] for row in rows if row["id"] == "d9"), "d3")
 
+    def test_followup_details_persist_export_and_clear(self):
+        note = 'Order 42, merchant said "Friday".\nFollow up by email.'
+        self.edit("d3", refund_due="2026-10-07", refund_note=note)
+        reopened = Store(self.path).state(self.selected)["report"]
+        item = next(item for item in reopened["watchlist"] if item["id"] == "d3")
+        self.assertEqual((item["refund_due"], item["refund_note"], item["remaining"]),
+                         ("2026-10-07", note, Decimal("300")))
+        exported = to_csv(reopened["transactions"])
+        imported, duplicate = self.store.import_csv("Reviewed", exported)
+        self.assertFalse(duplicate)
+        restored = next(row for row in self.store.state(imported)["report"]["transactions"] if row["id"] == "d3")
+        self.assertEqual((restored["refund_due"], restored["refund_note"]), ("2026-10-07", note))
+        selected, duplicate = self.store.import_csv("Original again", DEMO)
+        self.assertEqual((selected, duplicate), (self.selected, True))
+        self.assertEqual(self.report()["watchlist"][0]["refund_note"], note)
+        self.edit("d9", refund_for="d3")
+        item = self.report()["watchlist"][0]
+        self.assertEqual((item["remaining"], item["status"], item["refund_due"]),
+                         (Decimal("0"), "Received", "2026-10-07"))
+        self.edit("d3", refund_due="", refund_note="")
+        self.assertEqual(self.report()["watchlist"][0]["refund_due"], "")
+        self.assertEqual(self.report()["watchlist"][0]["refund_note"], "")
+
+    def test_bad_followup_edits_are_atomic(self):
+        before = self.report()
+        for transaction_id, changes in (
+            ("d3", {"refund_due": "2026-02-30"}),
+            ("d3", {"refund_due": "20261007"}),
+            ("d3", {"refund_due": "2026-09-04", "category": "Changed"}),
+            ("d3", {"refund_note": "x" * 201}),
+            ("d9", {"refund_due": "2026-10-07"}),
+            ("d7", {"refund_note": "Not a purchase"}),
+        ):
+            with self.subTest(changes=changes):
+                with self.assertRaises(ValueError):
+                    self.edit(transaction_id, **changes)
+                self.assertEqual(self.report(), before)
+
+    def test_invalid_followup_csv_is_rejected(self):
+        rows = self.report()["transactions"]
+        rows[0]["refund_due"] = "2026-09-01"
+        with self.assertRaisesRegex(ValueError, "before the purchase"):
+            self.store.import_csv("Bad date", to_csv(rows))
+        rows[0]["refund_due"] = ""
+        rows[0]["refund_note"] = "x" * 201
+        with self.assertRaisesRegex(ValueError, "200 characters"):
+            self.store.import_csv("Long note", to_csv(rows))
+        self.assertEqual(len(self.store.state()["datasets"]), 1)
+
+    def test_legacy_database_migrates_without_losing_edits_or_import_identity(self):
+        legacy_path = Path(self.temp.name) / "legacy.db"
+        rows = parse_transactions(DEMO)
+        fingerprint = hashlib.sha256(to_csv(rows, FIELDS).encode("utf-8")).hexdigest()
+        with closing(sqlite3.connect(legacy_path)) as db, db:
+            db.execute("CREATE TABLE datasets (id INTEGER PRIMARY KEY, name TEXT, fingerprint TEXT UNIQUE, version INTEGER, created_at TEXT)")
+            db.execute("INSERT INTO datasets VALUES (1, 'Old demo', ?, 4, '2026-10-08')", (fingerprint,))
+            db.execute("CREATE TABLE transactions (dataset_id INTEGER, id TEXT, date TEXT, description TEXT, amount TEXT, account TEXT, kind TEXT, category TEXT, refund_expected TEXT, refund_for TEXT, PRIMARY KEY (dataset_id, id))")
+            db.executemany("INSERT INTO transactions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                           [(1, *(str(row[field]) for field in FIELDS)) for row in rows])
+            db.execute("UPDATE transactions SET category = 'My category' WHERE id = 'd4'")
+        migrated = Store(legacy_path)
+        self.assertEqual(migrated.import_csv("Same original", DEMO), (1, True))
+        report = Store(legacy_path).state(1)["report"]
+        self.assertEqual(report["dataset"]["version"], 4)
+        self.assertEqual(next(row["category"] for row in report["transactions"] if row["id"] == "d4"), "My category")
+        self.assertTrue(all(row["refund_due"] == row["refund_note"] == "" for row in report["transactions"]))
+        migrated.update({"dataset_id": 1, "version": 4, "id": "d3",
+                         "changes": {"refund_due": "2026-10-07", "refund_note": "Call merchant"}})
+        self.assertEqual(Store(legacy_path).state(1)["report"]["watchlist"][0]["refund_note"], "Call merchant")
+
     def test_duplicate_headers_and_extra_fields_are_rejected(self):
         for data in (DEMO.replace("id,date", "id,id"), DEMO.replace("Food,,", "Food,,,extra")):
             with self.assertRaises(ValueError):
@@ -155,6 +228,21 @@ class WebTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertIn("columns", error["error"])
         self.assertEqual(len(self.request("/api/state")[1]["datasets"]), 1)
+
+    def test_followup_api_and_export(self):
+        _, loaded = self.request("/api/demo", {})
+        dataset = loaded["report"]["dataset"]
+        status, saved = self.request("/api/transaction", {
+            "dataset_id": dataset["id"], "version": dataset["version"], "id": "d3",
+            "changes": {"refund_due": "2026-10-07", "refund_note": "Order 42"}})
+        self.assertEqual(status, 200)
+        self.assertEqual(saved["report"]["watchlist"][0]["refund_due"], "2026-10-07")
+        _, exported = self.request("/api/export?dataset=" + str(dataset["id"]))
+        self.assertEqual(next(row["refund_note"] for row in parse_transactions(exported) if row["id"] == "d3"), "Order 42")
+        status, error = self.request("/api/transaction", {
+            "dataset_id": dataset["id"], "version": saved["report"]["dataset"]["version"], "id": "d3",
+            "changes": {"refund_due": "2026-02-30"}})
+        self.assertEqual(status, 400)
 
     def test_conflict_and_local_origin_checks(self):
         self.request("/api/demo", {})

@@ -12,7 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from main import (FIELDS, parse_transactions, refund_watchlist, spending_by_category,
+from main import (FIELDS, FOLLOWUP_FIELDS, parse_transactions, refund_watchlist, spending_by_category,
                   suggest_category, suggest_refund_links, summarize)
 
 
@@ -24,9 +24,10 @@ class ConflictError(ValueError):
     pass
 
 
-def to_csv(rows):
+def to_csv(rows, fields=None):
     output = io.StringIO(newline="")
-    writer = csv.DictWriter(output, fieldnames=FIELDS, extrasaction="ignore")
+    writer = csv.DictWriter(output, fieldnames=FIELDS + FOLLOWUP_FIELDS if fields is None else fields,
+                            extrasaction="ignore")
     writer.writeheader()
     writer.writerows(rows)
     return output.getvalue()
@@ -48,6 +49,10 @@ class Store:
                 refund_expected TEXT NOT NULL, refund_for TEXT NOT NULL,
                 PRIMARY KEY (dataset_id, id)
             )""")
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(transactions)")}
+            for field in FOLLOWUP_FIELDS:
+                if field not in columns:
+                    db.execute(f"ALTER TABLE transactions ADD COLUMN {field} TEXT NOT NULL DEFAULT ''")
 
     @contextmanager
     def connect(self):
@@ -81,7 +86,10 @@ class Store:
         rows = parse_transactions(text)
         if not rows or len(rows) > 10000:
             raise ValueError("Import between 1 and 10,000 transactions")
-        fingerprint = hashlib.sha256(to_csv(rows).encode("utf-8")).hexdigest()
+        # Keep fingerprints compatible with imports created before follow-up fields existed.
+        fingerprint_fields = FIELDS + FOLLOWUP_FIELDS if any(
+            row[field] for row in rows for field in FOLLOWUP_FIELDS) else FIELDS
+        fingerprint = hashlib.sha256(to_csv(rows, fingerprint_fields).encode("utf-8")).hexdigest()
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             existing = db.execute("SELECT id FROM datasets WHERE fingerprint = ?", (fingerprint,)).fetchone()
@@ -89,9 +97,10 @@ class Store:
                 return existing["id"], True
             dataset_id = db.execute("INSERT INTO datasets (name, fingerprint) VALUES (?, ?)",
                                     (name.strip(), fingerprint)).lastrowid
+            fields = FIELDS + FOLLOWUP_FIELDS
             db.executemany(
-                "INSERT INTO transactions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [(dataset_id, *(str(row[field]) for field in FIELDS)) for row in rows])
+                f"INSERT INTO transactions (dataset_id, {', '.join(fields)}) VALUES ({', '.join('?' for _ in range(len(fields) + 1))})",
+                [(dataset_id, *(str(row[field]) for field in fields)) for row in rows])
         return dataset_id, False
 
     def state(self, dataset_id=None):
@@ -124,8 +133,8 @@ class Store:
         changes = data.get("changes")
         if type(dataset_id) is not int or type(version) is not int or not isinstance(transaction_id, str):
             raise ValueError("Choose a transaction from the current import")
-        if not isinstance(changes, dict) or not changes or not set(changes) <= {"category", "refund_expected", "refund_for"}:
-            raise ValueError("Only category, expected refund, and refund link can be edited")
+        if not isinstance(changes, dict) or not changes or not set(changes) <= {"category", "refund_expected", "refund_for", *FOLLOWUP_FIELDS}:
+            raise ValueError("Only category, refund details, and refund link can be edited")
         if any(not isinstance(value, str) or len(value) > 200 for value in changes.values()):
             raise ValueError("Edits must be text of at most 200 characters")
         with self.connect() as db:
@@ -139,14 +148,14 @@ class Store:
             row = next((row for row in rows if row["id"] == transaction_id), None)
             if row is None:
                 raise ValueError("Transaction not found")
-            allowed = {"category", "refund_expected"} if row["kind"] == "purchase" else {"refund_for"} if row["kind"] == "refund" else set()
+            allowed = {"category", "refund_expected", *FOLLOWUP_FIELDS} if row["kind"] == "purchase" else {"refund_for"} if row["kind"] == "refund" else set()
             if not set(changes) <= allowed:
                 raise ValueError("That field does not apply to this transaction")
             row.update(changes)
             checked = parse_transactions(to_csv(rows))
             row = next(row for row in checked if row["id"] == transaction_id)
-            db.execute("UPDATE transactions SET category = ?, refund_expected = ?, refund_for = ? WHERE dataset_id = ? AND id = ?",
-                       (row["category"], str(row["refund_expected"]), row["refund_for"], dataset_id, transaction_id))
+            db.execute("UPDATE transactions SET category = ?, refund_expected = ?, refund_for = ?, refund_due = ?, refund_note = ? WHERE dataset_id = ? AND id = ?",
+                       (row["category"], str(row["refund_expected"]), row["refund_for"], row["refund_due"], row["refund_note"], dataset_id, transaction_id))
             db.execute("UPDATE datasets SET version = version + 1 WHERE id = ?", (dataset_id,))
 
 

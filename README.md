@@ -19,6 +19,7 @@ Open [MoneyTrail](http://127.0.0.1:8001) in your browser. Keep the terminal runn
 - See spending by category, search transactions, and filter by transaction type.
 - Accept a category suggestion or enter your own category.
 - Mark a purchase as expecting a full or partial refund.
+- Set an expected refund date, keep a short note, and filter the watchlist to overdue refunds.
 - Review suggested refund links, choose a purchase manually, or undo a link.
 - Download a CSV containing your reviewed categories and refund links.
 
@@ -33,6 +34,7 @@ Click **Load student demo**. All of its transactions are synthetic.
 3. Net spending stays INR 3,280 because that credit was already in the statement. Confirming its link only changes the watchlist.
 4. Click **Use Food** for the Swiggy purchase. Its INR 320 moves from Uncategorized to Food.
 5. Use **Edit** to enter another category or expected refund amount. Refresh to check the saved result, then download the reviewed CSV.
+6. Choose **Edit refund details** on a watchlist item. Add the date the merchant gave you and an optional note, then save. Use **Overdue only** to see refunds whose expected dates have passed and still have money due.
 
 The demo is saved too. Loading it again reopens your edited copy.
 
@@ -50,6 +52,10 @@ r2,2026-09-15,BOOKSTORE FINAL REFUND,300.00,Card,refund,,,
 Each transaction needs a unique ID within its file. Purchases have negative amounts, refunds have positive amounts, and `kind` is `purchase`, `refund`, or `transfer`. Money values support up to two decimal places and must be below one billion INR. The web importer accepts up to 2 MB and 10,000 rows. It validates the whole file before saving.
 
 Leave `category` blank to review it later. Leave `refund_expected` blank or use 0 if you are not tracking a refund. On a refund row, `refund_for` is the original purchase's ID; leave it blank until you confirm the link.
+
+Two optional columns, `refund_due` and `refund_note`, store follow-up details on purchases. `refund_due` uses YYYY-MM-DD and cannot be before the purchase date. `refund_note` allows up to 200 characters. Older CSVs work without either column; reviewed CSV downloads include both. Saved databases are upgraded automatically, preserving existing imports and edits.
+
+Expected dates are entered by you, based on what the merchant told you. A refund becomes overdue the day after that date, using your browser's local calendar date, while money is still due. A date of today shows **Due today**. Purchases without a date, fully received refunds, and purchases with no expected refund amount are never marked overdue. Linking the final refund removes an item from the overdue filter; its date and note remain saved. The filter only changes the watchlist, so overview totals stay the same. This feature does not send notifications.
 
 Bank exports may need their columns converted to this format first.
 
@@ -94,6 +100,8 @@ python -m unittest -v
 ```
 
 Tests use temporary databases and synthetic data. They cover partial refunds, duplicate imports, persistence, invalid updates, stale edits, CSV export, and the HTTP API.
+
+If Node.js is available, run `node test_frontend.cjs` for the date labels, overdue filter, and edit-form checks. These use a small simulated DOM; they do not replace a visual browser check. The app itself still only requires Python.
 
 ## Current scope
 

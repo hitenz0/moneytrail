@@ -16,46 +16,52 @@
     </header>
     <main>
         <div class="workspace-bar">
-            <div><label for="dataset">Your saved imports</label><select id="dataset"><option value="">No imports yet</option></select></div>
+            <div><label for="dataset">Saved imports</label><select id="dataset"><option value="">No imports yet</option></select></div>
             <div class="actions"><button id="demo" class="secondary">Load student demo</button><button id="import">Import CSV</button></div>
             <input type="file" id="file" accept=".csv,text/csv" hidden>
         </div>
         <div id="notice" role="status" hidden></div>
         <noscript><p class="notice error">Enable JavaScript to use MoneyTrail.</p></noscript>
         <section id="empty" class="empty-panel">
-            <span class="tag">START HERE</span><h2>Follow your spending. Close the loop on refunds.</h2>
-            <p>Import a transaction CSV or load the student demo to try a partial refund, an unlinked credit, and purchases waiting for categories.</p>
-            <p class="note">Imports and edits are saved on this computer. Each file has its own workspace.</p>
+            <span class="tag">START HERE</span><h2>See where you spent. Track what comes back.</h2>
+            <p>Import your transactions as a CSV, or load the student demo to explore spending and refunds.</p>
+            <p class="note">Your imports and edits are saved on this computer. Each import is kept separate.</p>
         </section>
         <div id="dashboard" hidden>
             <div class="section-heading"><div><p class="eyebrow">SPENDING OVERVIEW</p><h2 id="dataset-name"></h2><p id="dataset-meta" class="note"></p></div><a id="export" class="button secondary" href="#">Download reviewed CSV</a></div>
             <div class="cards">
-                <div class="card"><span>Purchases</span><strong id="purchases">—</strong><small>Card bills excluded</small></div>
-                <div class="card"><span>Refund credits</span><strong id="refunds">—</strong><small>All credits in this import</small></div>
+                <div class="card"><span>Purchases</span><strong id="purchases">—</strong><small>Transfers and card-bill payments excluded</small></div>
+                <div class="card"><span>Refund credits</span><strong id="refunds">—</strong><small>All refunds in this import</small></div>
                 <div class="card"><span>Net spending</span><strong id="net">—</strong><small>Purchases minus refund credits</small></div>
-                <div class="card due-card"><span>Refunds still due</span><strong id="still-due">—</strong><small>Expected minus confirmed links</small></div>
+                <div class="card due-card"><span>Refunds still due</span><strong id="still-due">—</strong><small>Expected refunds still outstanding</small></div>
             </div>
             <div class="columns">
-                <section><div class="section-heading"><h2>Where it went</h2><span class="tag">BEFORE REFUNDS</span></div><div id="categories"></div><p class="note small">Blank categories stay uncategorized until you choose one.</p></section>
-                <section><div class="section-heading"><h2>Refund watchlist</h2><span class="tag" id="watch-count"></span></div><div id="watchlist"></div></section>
+                <section><div class="section-heading"><h2>Where it went</h2><span class="tag">BEFORE REFUNDS</span></div><div id="categories"></div><p class="note small">Choose categories for uncategorized purchases in the table below.</p></section>
+                <section><div class="section-heading"><h2>Refund watchlist</h2><span class="tag" id="watch-count"></span></div><label class="watch-filter">Show refunds<select id="watch-filter"><option value="all">All tracked refunds</option><option value="overdue">Overdue only</option></select></label><p class="note small">Dates are set by you. Only refunds with money still due can be overdue.</p><div id="watchlist" aria-live="polite"></div></section>
             </div>
-            <section><div class="section-heading"><div><h2>Refunds to review</h2><p class="note">Check the credit against your order before confirming a link.</p></div><span class="tag" id="review-count"></span></div><div id="refund-review"></div></section>
+            <section><div class="section-heading"><div><h2>Refunds to review</h2><p class="note">Check that each refund belongs to the purchase before linking it.</p></div><span class="tag" id="review-count"></span></div><div id="refund-review"></div></section>
             <section>
                 <div class="section-heading"><div><h2>Transactions</h2><p class="note" id="transaction-count"></p></div></div>
                 <div class="filters"><label>Search<input id="search" type="search" placeholder="Merchant, account, category or ID"></label><label>Transaction type<select id="kind"><option value="">All types</option><option value="purchase">Purchases</option><option value="refund">Refunds</option><option value="transfer">Transfers</option></select></label></div>
                 <div class="table-wrap"><table><thead><tr><th>Date / ID</th><th>Description</th><th>Account</th><th>Category / link</th><th class="amount">Amount</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody id="transactions"></tbody></table></div>
-                <p class="note small">Search and type filters apply to this table. Overview totals cover the full import.</p>
+                <p class="note small">Filters change the table. Overview totals include the whole import.</p>
             </section>
         </div>
-        <details class="format-help"><summary>CSV format and how imports work</summary><p>Use UTF-8 text with these columns:</p><code>id,date,description,amount,account,kind,category,refund_expected,refund_for</code><p>Use dates like 2026-09-05. Purchases have negative amounts; refunds have positive amounts. Kind is purchase, refund, or transfer. Category, refund_expected, and refund_for can be blank. Limit: 2 MB and 10,000 rows.</p><p>Reimporting the same original file reopens its saved workspace. Your original CSV stays as it was; download the reviewed CSV to keep your edits in a file. Bank exports may need their columns converted first.</p></details>
+        <details class="format-help"><summary>CSV format and how imports work</summary><p>Use UTF-8 text with these columns:</p><code>id,date,description,amount,account,kind,category,refund_expected,refund_for</code><p>Use dates like 2026-09-05. Purchases have negative amounts; refunds have positive amounts. Kind is purchase, refund, or transfer. Category, refund_expected, and refund_for can be blank. Limit: 2 MB and 10,000 rows.</p><p>Reimporting the same original file reopens its saved workspace. Your original CSV stays as it was; download the reviewed CSV to keep your edits in a file. Bank exports may need their columns converted first.</p>
+        <p class="note small">CSV imports also accept optional refund_due and refund_note columns for purchases. Use YYYY-MM-DD for the expected date and up to 200 characters for a note. Reviewed CSV downloads include these details.</p>
+        </details>
         <footer>MoneyTrail <span>Built a little at a time.</span></footer>
     </main>
     <dialog id="edit-dialog">
         <form id="edit-form">
             <div class="section-heading"><h2 id="edit-title">Edit transaction</h2><button type="button" id="close-dialog" class="icon-button" aria-label="Close edit dialog">×</button></div>
             <p id="edit-description"></p><p id="edit-details" class="note"></p>
-            <div id="purchase-fields"><label>Category<input id="edit-category" maxlength="200" list="category-options" placeholder="Choose or type a category"></label><datalist id="category-options"><option value="Food"><option value="Transport"><option value="Shopping"><option value="Study"><option value="Subscriptions"></datalist><label>Expected refund (INR)<input id="edit-expected" type="number" min="0" step="0.01" required></label><p class="note small">Enter the amount you expect back. Use 0 when you are not tracking a refund.</p></div>
-            <div id="refund-fields"><label>This refund belongs to<select id="edit-link"></select></label><p class="note small">Choose Unlinked to undo a link. A confirmed link counts toward that purchase's refund watchlist.</p></div>
+            <div id="purchase-fields"><label>Category<input id="edit-category" maxlength="200" list="category-options" placeholder="Choose or type a category"></label><datalist id="category-options"><option value="Food"><option value="Transport"><option value="Shopping"><option value="Study"><option value="Subscriptions"></datalist><label>Expected refund (INR)<input id="edit-expected" type="number" min="0" step="0.01" required></label><p class="note small">Enter how much you expect back, or 0 if no refund is expected.</p></div>
+            <div id="followup-fields">
+                <label for="edit-due">Expected by (optional)</label><input id="edit-due" type="date" aria-describedby="due-help"><p id="due-help" class="note small">Use the date the merchant gave you. Clear it if you don't have one.</p>
+                <label for="edit-note">Refund note (optional)</label><textarea id="edit-note" rows="3" maxlength="200" placeholder="Order reference or what the merchant said" aria-describedby="note-help"></textarea><p id="note-help" class="note small">Up to 200 characters. Enter an expected refund amount above to show this purchase in the watchlist.</p>
+            </div>
+            <div id="refund-fields"><label>This refund belongs to<select id="edit-link"></select></label><p class="note small">Link this refund to update the purchase's watchlist. Choose Unlinked to remove a link.</p></div>
             <p id="edit-error" class="error" role="alert" hidden></p>
             <div class="dialog-actions"><button type="button" id="cancel-dialog" class="secondary">Cancel</button><button type="submit">Save changes</button></div>
         </form>
