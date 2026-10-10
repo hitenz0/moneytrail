@@ -77,6 +77,9 @@ function render() {
     $("dataset").value = report?.dataset.id || "";
     $("empty").hidden = Boolean(report);
     $("dashboard").hidden = !report;
+    const bills = document.querySelector(".bills-section");
+    if (report) $("transactions-section").before(bills);
+    else $("dashboard").after(bills);
     if (!report) return;
     $("dataset-name").textContent = report.dataset.name;
     const dates = report.transactions.map((row) => row.date).sort();

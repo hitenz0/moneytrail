@@ -46,25 +46,25 @@
                 <section><div class="section-heading"><h2>Refund watchlist</h2><span class="tag" id="watch-count"></span></div><label class="watch-filter">Show refunds<select id="watch-filter"><option value="all">All tracked refunds</option><option value="overdue">Overdue only</option></select></label><p class="note small">Dates are set by you. Only refunds with money still due can be overdue.</p><div id="watchlist" aria-live="polite"></div></section>
             </div>
             <section><div class="section-heading"><div><h2>Refunds to review</h2><p class="note">Check that each refund belongs to the purchase before linking it.</p></div><span class="tag" id="review-count"></span></div><div id="refund-review"></div></section>
-            <section>
+            <section class="bills-section" aria-labelledby="bills-heading">
+                <div class="section-heading"><div><p class="eyebrow">PLAN AHEAD</p><h2 id="bills-heading">Subscriptions &amp; bills</h2><p class="note">Know what's due this week, including payments you expect on autopay.</p></div><button id="add-bill" type="button">Add a bill</button></div>
+                <div id="bills-message" class="note small" role="status" hidden></div>
+                <div class="bill-stats">
+                    <div><span>Due in the next 7 days</span><strong id="bills-week">—</strong><small>Today through six days from now</small></div>
+                    <div><span>Past due</span><strong id="bills-overdue">—</strong><small id="bills-overdue-count">Needs a payment check</small></div>
+                    <div><span>Monthly recurring average</span><strong id="bills-monthly">—</strong><small>Active recurring bills only</small></div>
+                </div>
+                <div class="bill-toolbar"><label for="bills-filter">Show bills</label><select id="bills-filter"><option value="active">Active</option><option value="week">Next 7 days</option><option value="overdue">Past due</option><option value="inactive">Paused &amp; paid</option></select></div>
+                <div id="bills-list" aria-live="polite"><p class="note">Loading bills…</p></div>
+                <p class="note small">Bill dates and autopay labels are entered by you. Check your bank or provider to confirm a payment. This schedule is separate from imported spending.</p>
+            </section>
+            <section id="transactions-section">
                 <div class="section-heading"><div><h2>Transactions</h2><p class="note" id="transaction-count"></p></div></div>
                 <div class="filters"><label>Search<input id="search" type="search" placeholder="Merchant, account, category or ID"></label><label>Transaction type<select id="kind"><option value="">All types</option><option value="purchase">Purchases</option><option value="refund">Refunds</option><option value="transfer">Transfers</option></select></label></div>
                 <div class="table-wrap"><table><thead><tr><th>Date / ID</th><th>Description</th><th>Account</th><th>Category / link</th><th class="amount">Amount</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody id="transactions"></tbody></table></div>
                 <p class="note small">Filters change the table. Overview totals include the whole import.</p>
             </section>
         </div>
-        <section class="bills-section" aria-labelledby="bills-heading">
-            <div class="section-heading"><div><p class="eyebrow">PLAN AHEAD</p><h2 id="bills-heading">Subscriptions &amp; bills</h2><p class="note">Know what's due this week, including payments you expect on autopay.</p></div><button id="add-bill" type="button">Add a bill</button></div>
-            <div id="bills-message" class="note small" role="status" hidden></div>
-            <div class="bill-stats">
-                <div><span>Due in the next 7 days</span><strong id="bills-week">—</strong><small>Today through six days from now</small></div>
-                <div><span>Past due</span><strong id="bills-overdue">—</strong><small id="bills-overdue-count">Needs a payment check</small></div>
-                <div><span>Monthly recurring average</span><strong id="bills-monthly">—</strong><small>Active recurring bills only</small></div>
-            </div>
-            <div class="bill-toolbar"><label for="bills-filter">Show bills</label><select id="bills-filter"><option value="active">Active</option><option value="week">Next 7 days</option><option value="overdue">Past due</option><option value="inactive">Paused &amp; paid</option></select></div>
-            <div id="bills-list" aria-live="polite"><p class="note">Loading bills…</p></div>
-            <p class="note small">Bill dates and autopay labels are entered by you. Check your bank or provider to confirm a payment. This schedule is separate from imported spending.</p>
-        </section>
         <details class="format-help"><summary>CSV format and how imports work</summary><p>Use UTF-8 text with these columns:</p><code>id,date,description,amount,account,kind,category,refund_expected,refund_for</code><p>Use dates like 2026-09-05. Purchases have negative amounts; refunds have positive amounts. Kind is purchase, refund, or transfer. Category, refund_expected, and refund_for can be blank. Limit: 2 MB and 10,000 rows.</p><p>Reimporting the same original file reopens its saved workspace. Your original CSV stays as it was; download the reviewed CSV to keep your edits in a file. Bank exports may need their columns converted first.</p>
         <p class="note small">CSV imports also accept optional refund_due and refund_note columns for purchases. Use YYYY-MM-DD for the expected date and up to 200 characters for a note. Reviewed CSV downloads include these details.</p>
         </details>
