@@ -11,6 +11,9 @@ from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+from datetime import date
+
+from bills import BillConflictError, bill_date, bill_report, create_bill_table, save_bill
 
 from main import (FIELDS, FOLLOWUP_FIELDS, parse_transactions, refund_watchlist, spending_by_category,
                   suggest_category, suggest_refund_links, summarize)
@@ -53,6 +56,7 @@ class Store:
             for field in FOLLOWUP_FIELDS:
                 if field not in columns:
                     db.execute(f"ALTER TABLE transactions ADD COLUMN {field} TEXT NOT NULL DEFAULT ''")
+            create_bill_table(db)
 
     @contextmanager
     def connect(self):
@@ -68,6 +72,16 @@ class Store:
     def datasets(self, db):
         return [dict(row) for row in db.execute(
             "SELECT id, name, version, created_at FROM datasets ORDER BY id DESC")]
+
+    def bills(self, today):
+        with self.connect() as db:
+            return bill_report(db, today)
+
+    def update_bill(self, data, today):
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            save_bill(db, data, today)
+            return bill_report(db, today)
 
     def rows(self, db, dataset_id):
         rows = [dict(row) for row in db.execute(
@@ -189,6 +203,7 @@ class Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         static = {"/": ("index.html", "text/html"), "/index.html": ("index.html", "text/html"),
                   "/app.js": ("app.js", "text/javascript"), "/theme.js": ("theme.js", "text/javascript"),
+                  "/bills.js": ("bills.js", "text/javascript"),
                   "/style.css": ("style.css", "text/css")}
         if url.path in static:
             name, content_type = static[url.path]
@@ -197,7 +212,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             selected = parse_qs(url.query).get("dataset", [None])[0]
             selected = int(selected) if selected is not None else None
-            if url.path == "/api/state":
+            if url.path == "/api/bills":
+                today = bill_date(parse_qs(url.query).get("today", [date.today().isoformat()])[0])
+                self.send(200, self.server.store.bills(today))
+            elif url.path == "/api/state":
                 self.send(200, self.server.store.state(selected))
             elif url.path == "/api/export":
                 state = self.server.store.state(selected)
@@ -225,6 +243,10 @@ class Handler(BaseHTTPRequestHandler):
             data = json.loads(self.rfile.read(length))
             if not isinstance(data, dict):
                 raise ValueError("Expected a JSON object")
+            if self.path == "/api/bills":
+                today = bill_date(data.get("today"))
+                self.send(200, self.server.store.update_bill(data, today))
+                return
             duplicate = False
             if self.path == "/api/import":
                 selected, duplicate = self.server.store.import_csv(data.get("name"), data.get("csv"))
@@ -239,7 +261,7 @@ class Handler(BaseHTTPRequestHandler):
             state = self.server.store.state(selected)
             state["duplicate"] = duplicate
             self.send(200, state)
-        except ConflictError as error:
+        except (ConflictError, BillConflictError) as error:
             self.send(409, {"error": str(error)})
         except (ValueError, csv.Error, UnicodeError) as error:
             self.send(400, {"error": str(error)})

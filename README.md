@@ -21,10 +21,19 @@ Open [MoneyTrail](http://127.0.0.1:8001) in your browser. Keep the terminal runn
 - Accept a category suggestion or enter your own category.
 - Mark a purchase as expecting a full or partial refund.
 - Set an expected refund date, keep a short note, and filter the watchlist to overdue refunds.
+- Add one-time bills or recurring subscriptions, see what's due over the next seven days, and flag past-due payments.
 - Review suggested refund links, choose a purchase manually, or undo a link.
 - Download a CSV containing your reviewed categories and refund links.
 
 Edits are saved in `data/moneytrail.db`, a local SQLite database excluded from Git. Reloading the page or restarting the server keeps your work. The original CSV is not changed. Reimporting the same original transaction data reopens its saved workspace, including edits; a different import gets a separate workspace. Links stay within one import, so include the purchase and its later refund in the same CSV.
+
+## Bills and subscriptions
+
+Use **Add a bill** to enter an amount, next payment date, and whether the bill is one-time, weekly, monthly, every three months, or yearly. Bills are saved locally and appear even when you have not imported a CSV. They are shared across saved imports, so changing statements does not hide your bill deadlines. You can edit or pause a bill, filter to the next seven days or past-due bills, and see the amount due from today through six days ahead. Past-due amounts are shown separately. Dates use your browser's local calendar day.
+
+Choose **Autopay** only as a label for a payment you expect the provider to take automatically. MoneyTrail does not set up, cancel, verify, or make payments. When an autopay date passes, check your bank or provider before marking it paid. **Mark paid** advances a recurring bill by one billing period; a one-time bill moves to the paid list. **Undo last payment** reverses the latest mark. Pausing a bill keeps its next date, so check or edit that date when you resume. Imported spending totals remain based on your CSV and are not changed by bill tracking.
+
+The monthly recurring average combines active weekly, monthly, quarterly, and yearly amounts as 52/12, 1, 1/3, and 1/12 months respectively. One-time and paused bills are excluded. It is an average for planning; actual payment dates and amounts are shown in the bill list.
 
 ## Try the demo
 
@@ -104,6 +113,8 @@ Tests use temporary databases and synthetic data. They cover partial refunds, du
 
 If Node.js is available, run `node test_frontend.cjs` for theme switching and persistence, date labels, the overdue filter, and edit-form checks. These use a small simulated DOM; they do not replace a visual browser check. The app itself still only requires Python.
 
+Run `node test_bills_frontend.cjs` to check the bill filters, autopay label, and edit actions in a simulated DOM.
+
 ## Current scope
 
-This is a local app for one person, bound to 127.0.0.1. It has no bank connection, login system, or public hosting. Imports are separate workspaces rather than a combined account history. The interface is a working starting point; the visual design is still being developed.
+This is a local app for one person, bound to 127.0.0.1. It has no bank connection, login system, or public hosting. Imports are separate workspaces rather than a combined account history. Bill dates are entered manually, and the app does not send notifications. The interface is a working starting point; the visual design is still being developed.

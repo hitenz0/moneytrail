@@ -7,6 +7,7 @@
     <script src="/theme.js"></script>
     <link rel="stylesheet" href="/style.css">
     <script src="/app.js" defer></script>
+    <script src="/bills.js" defer></script>
 </head>
 <body>
     <header>
@@ -20,6 +21,18 @@
     </header>
     <main>
         <div class="page-intro"><p class="eyebrow">YOUR MONEY, ACCOUNTED FOR</p><h2>Your money, at a glance.</h2><p class="note">Follow your spending. Keep track of what comes back.</p></div>
+        <section class="bills-section" aria-labelledby="bills-heading">
+            <div class="section-heading"><div><p class="eyebrow">PLAN AHEAD</p><h2 id="bills-heading">Subscriptions &amp; bills</h2><p class="note">Know what's due this week, including payments you expect on autopay.</p></div><button id="add-bill" type="button">Add a bill</button></div>
+            <div id="bills-message" class="note small" role="status" hidden></div>
+            <div class="bill-stats">
+                <div><span>Due in the next 7 days</span><strong id="bills-week">—</strong><small>Today through six days from now</small></div>
+                <div><span>Past due</span><strong id="bills-overdue">—</strong><small id="bills-overdue-count">Needs a payment check</small></div>
+                <div><span>Monthly recurring average</span><strong id="bills-monthly">—</strong><small>Active recurring bills only</small></div>
+            </div>
+            <div class="bill-toolbar"><label for="bills-filter">Show bills</label><select id="bills-filter"><option value="active">Active</option><option value="week">Next 7 days</option><option value="overdue">Past due</option><option value="inactive">Paused &amp; paid</option></select></div>
+            <div id="bills-list" aria-live="polite"><p class="note">Loading bills…</p></div>
+            <p class="note small">Bill dates and autopay labels are entered by you. Check your bank or provider to confirm a payment. This schedule is separate from imported spending.</p>
+        </section>
         <div class="workspace-bar">
             <div><label for="dataset">Saved imports</label><select id="dataset"><option value="">No imports yet</option></select></div>
             <div class="actions"><button id="demo" class="secondary">Load student demo</button><button id="import">Import CSV</button></div>
@@ -69,6 +82,18 @@
             <div id="refund-fields"><label>This refund belongs to<select id="edit-link"></select></label><p class="note small">Link this refund to update the purchase's watchlist. Choose Unlinked to remove a link.</p></div>
             <p id="edit-error" class="error" role="alert" hidden></p>
             <div class="dialog-actions"><button type="button" id="cancel-dialog" class="secondary">Cancel</button><button type="submit">Save changes</button></div>
+        </form>
+    </dialog>
+    <dialog id="bill-dialog">
+        <form id="bill-form">
+            <div class="section-heading"><h2 id="bill-dialog-title">Add a bill</h2><button type="button" id="bill-close" class="icon-button" aria-label="Close bill dialog">×</button></div>
+            <label for="bill-name">Bill or subscription name</label><input id="bill-name" maxlength="100" placeholder="Internet, rent, music plan…" required>
+            <div class="bill-form-row"><div><label for="bill-amount">Amount (INR)</label><input id="bill-amount" type="number" min="0.01" max="999999999.99" step="0.01" required></div><div><label for="bill-due">Next payment date</label><input id="bill-due" type="date" required></div></div>
+            <div class="bill-form-row"><div><label for="bill-cadence">Repeats</label><select id="bill-cadence"><option value="monthly">Monthly</option><option value="once">One time</option><option value="weekly">Weekly</option><option value="quarterly">Every 3 months</option><option value="yearly">Yearly</option></select></div><div><label for="bill-method">Payment method</label><select id="bill-method"><option value="manual">I'll pay it</option><option value="autopay">Autopay</option></select></div></div>
+            <label for="bill-note">Note (optional)</label><textarea id="bill-note" rows="2" maxlength="200" placeholder="Account, provider, or anything to remember"></textarea>
+            <p class="note small">The Autopay label helps you track the date. Confirm or change the actual payment in your bank or provider.</p>
+            <p id="bill-form-error" class="error" role="alert" hidden></p>
+            <div class="dialog-actions"><button type="button" id="bill-cancel" class="secondary">Cancel</button><button type="submit">Save bill</button></div>
         </form>
     </dialog>
 </body>

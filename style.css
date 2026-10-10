@@ -91,6 +91,31 @@ section { margin-bottom: 24px; }
 .track { height: 7px; background: var(--track); border-radius: 10px; overflow: hidden; }
 .fill { height: 100%; background: var(--fill); border-radius: inherit; }
 .watch-item { padding: 17px; border: 1px solid var(--line); background: var(--surface-soft); border-radius: 12px; }
+.bills-section { margin-bottom: 30px; }
+.bills-section .section-heading { margin-bottom: 20px; }
+.bills-section .section-heading .note { margin: 6px 0 0; }
+#bills-message { margin: 0 0 14px; }
+.bill-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.bill-stats > div { padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
+.bill-stats span, .bill-stats small { display: block; color: var(--muted); font-size: 11px; }
+.bill-stats strong { display: block; margin: 5px 0; font-size: 23px; letter-spacing: -.6px; overflow-wrap: anywhere; }
+.bill-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.bill-toolbar select { width: min(240px, 100%); margin: 0; }
+.bill-item { display: flex; justify-content: space-between; gap: 18px; padding: 17px 0; border-top: 1px solid var(--line); }
+.bill-details { min-width: 0; overflow-wrap: anywhere; }
+.bill-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.bill-heading strong { font-size: 14px; }
+.bill-details p { margin: 5px 0 0; }
+.bill-note { white-space: pre-wrap; }
+.bill-side { text-align: right; flex-shrink: 0; }
+.bill-amount { display: block; font-size: 17px; margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+.bill-actions { display: flex; gap: 6px; justify-content: end; flex-wrap: wrap; max-width: 320px; }
+.bill-actions button { padding: 5px 9px; font-size: 12px; }
+.bill-empty { padding: 12px 0; }
+.status.bill-late { background: var(--error-bg); color: var(--error-ink); }
+.status.bill-soon { background: var(--warning-bg); color: var(--warning-ink); }
+.status.paused { background: var(--surface-soft); color: var(--muted); border: 1px solid var(--line); }
+.bill-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .watch-item + .watch-item { margin-top: 12px; }
 .watch-heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; align-items: start; margin-bottom: 8px; }
 .watch-heading strong { font-size: 13px; overflow-wrap: anywhere; min-width: 0; }
@@ -141,6 +166,7 @@ dialog label { margin-top: 18px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
 @media (max-width: 1000px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .card strong { font-size: 32px; } }
 @media (max-width: 800px) { .columns { grid-template-columns: 1fr; gap: 0; } .review-item { align-items: start; flex-direction: column; } .local-badge { display: none; } }
+@media (max-width: 700px) { .bill-stats { grid-template-columns: 1fr; } .bill-item { flex-direction: column; gap: 10px; } .bill-side { text-align: left; } .bill-actions { justify-content: start; max-width: none; } }
 @media (max-width: 560px) {
     main { padding: 26px 16px 12px; } header { padding: 17px 16px; }
     .header-inner { gap: 10px; flex-wrap: wrap; } .brand { gap: 9px; }
@@ -151,6 +177,7 @@ dialog label { margin-top: 18px; }
     .actions > button { flex: 1; } section, .card { padding: 18px; border-radius: 14px; } .cards { gap: 12px; } .card strong { font-size: 26px; letter-spacing: -1px; }
     .card-label { gap: 4px; } .stat-icon { width: 24px; height: 24px; font-size: 17px; } .empty-panel { padding: 32px 18px; }
     .filters { flex-direction: column; gap: 10px; } .section-heading { align-items: start; } table { min-width: 700px; } dialog { padding: 21px; } .watch-item { padding: 14px; }
+    .bill-form-row { grid-template-columns: 1fr; gap: 0; } .bill-toolbar { align-items: start; flex-direction: column; }
 }
 @media (max-width: 360px) { .cards { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { button, .button { transition: none; } }
