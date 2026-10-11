@@ -9,7 +9,7 @@ class Element {
         this.textContent = text;
         this.children = [];
         this.value = '';
-        this.style = {};
+        this.style = {setProperty(name, value) { this[name] = value; }};
         this.listeners = {};
         this.attributes = {};
     }
@@ -21,7 +21,8 @@ class Element {
     close() { this.open = false; }
 }
 
-const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+const source = path.join(__dirname, '..', 'src');
+const html = fs.readFileSync(path.join(source, 'templates', 'index.html'), 'utf8');
 const elements = Object.fromEntries([...html.matchAll(/id="([^"]+)"/g)].map((match) => [match[1], new Element()]));
 const posts = [];
 class Today extends Date {
@@ -43,7 +44,7 @@ const context = vm.createContext({
         return {ok: true, json: async () => ({datasets: [], report: null})};
     },
 });
-vm.runInContext(fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8'), context);
+vm.runInContext(fs.readFileSync(path.join(source, 'static', 'app.js'), 'utf8'), context);
 
 function themeSession(saved, darkSystem = false, blockedStorage = false) {
     const root = {dataset: {}};
@@ -57,7 +58,7 @@ function themeSession(saved, darkSystem = false, blockedStorage = false) {
     let systemChanged;
     const storage = {value: saved};
     const system = {matches: darkSystem, addEventListener(name, handler) { systemChanged = handler; }};
-    vm.runInNewContext(fs.readFileSync(path.join(__dirname, 'theme.js'), 'utf8'), {
+    vm.runInNewContext(fs.readFileSync(path.join(source, 'static', 'theme.js'), 'utf8'), {
         window: {matchMedia() { return system; }},
         document: {
             documentElement: root,
@@ -141,6 +142,10 @@ async function main() {
     elements['watch-filter'].listeners.change();
     assert.equal(elements.watchlist.children[0].className, 'watch-item');
     assert.doesNotMatch(elements.watchlist.children[0].children[1].textContent, /overdue/);
+    state.report.watchlist.push({...item, id: 'p2', description: 'Still waiting', remaining: '500', received: '0', status: 'Waiting'});
+    context.useState(state);
+    assert.equal(elements.watchlist.children[0].children[0].children[0].textContent, 'Still waiting');
+    state.report.watchlist.pop();
 
     context.openEdit('p1');
     assert.equal(elements['followup-fields'].hidden, false);
@@ -158,7 +163,41 @@ async function main() {
     assert.equal(posts[0].changes.refund_due, '2026-10-12');
     assert.equal(posts[0].changes.refund_note, 'Merchant extended the date');
     assert.equal(elements['edit-dialog'].open, false);
-    console.log('Frontend checks passed: theme switching/persistence, dates, refunds, filter, notes, edit form, and save payload.');
+
+    // Large imports render only one page; filters and dataset changes reset it.
+    const large = {...state, report: {...state.report, dataset: {...dataset, id: 2}, watchlist: [],
+        transactions: Array.from({length: 61}, (_, i) => ({...purchase, id: 'row-' + i,
+            description: 'Merchant ' + i, date: '2026-09-' + String(i % 28 + 1).padStart(2, '0')}))}};
+    context.useState(large);
+    assert.equal(elements.transactions.children.length, 25);
+    assert.equal(elements['prev-page'].disabled, true);
+    assert.equal(elements['next-page'].disabled, false);
+    elements['next-page'].listeners.click();
+    assert.equal(elements.transactions.children.length, 25);
+    elements['next-page'].listeners.click();
+    assert.equal(elements.transactions.children.length, 11);
+    assert.equal(elements['next-page'].disabled, true);
+    await context.action(async () => {});
+    assert.equal(elements['next-page'].disabled, true); // Busy state preserves pagination boundaries.
+    elements.search.value = 'row-60';
+    elements.search.listeners.input();
+    assert.equal(elements.transactions.children.length, 1);
+    assert.equal(elements['prev-page'].disabled, true);
+    assert.equal(elements.pagination.hidden, true);
+    elements.search.value = 'no such merchant';
+    elements.search.listeners.input();
+    assert.match(elements.transactions.children[0].children[0].textContent, /No matching transactions/);
+    elements.search.value = '';
+    elements.search.listeners.input();
+    elements['next-page'].listeners.click();
+    context.useState(state);
+    assert.equal(elements['prev-page'].disabled, true);
+    assert.equal(elements.transactions.children.length, 2);
+    context.useState({datasets: [], report: null});
+    assert.equal(elements.dashboard.hidden, true);
+    assert.equal(elements['transactions-section'].hidden, true);
+    assert.notEqual(elements['bills-section'].hidden, true);
+    console.log('Frontend checks passed: themes, refunds, forms, 25-row pagination, filters, disabled controls, and empty imports.');
 }
 
 module.exports = main();

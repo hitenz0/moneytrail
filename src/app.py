@@ -1,4 +1,4 @@
-"""Local web app. Run with: python app.py"""
+"""Local web app. Run from the project root with: python -m src.app"""
 
 import argparse
 import csv
@@ -13,13 +13,15 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from datetime import date
 
-from bills import BillConflictError, bill_date, bill_report, create_bill_table, save_bill
+from .bills import BillConflictError, bill_date, bill_report, create_bill_table, save_bill
 
-from main import (FIELDS, FOLLOWUP_FIELDS, parse_transactions, refund_watchlist, spending_by_category,
-                  suggest_category, suggest_refund_links, summarize)
+from .main import (FIELDS, FOLLOWUP_FIELDS, parse_transactions, refund_watchlist,
+                   spending_by_category, suggest_category, suggest_refund_links, summarize)
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
+STATIC_DIR = ROOT / "src" / "static"
+TEMPLATE_DIR = ROOT / "src" / "templates"
 MAX_UPLOAD = 2 * 1024 * 1024
 
 
@@ -135,7 +137,7 @@ class Store:
             "summary": {"purchases": gross, "refunds": refunds, "net": net,
                         "still_due": sum((item["remaining"] for item in watchlist), Decimal(0))},
             "categories": spending_by_category(rows), "watchlist": watchlist,
-            "refund_suggestions": suggest_refund_links(rows),
+            "refund_suggestions": suggest_refund_links(rows, watchlist),
             "category_suggestions": {row["id"]: suggest_category(row["description"])
                                      for row in rows if row["kind"] == "purchase" and not row["category"]}
         }}
@@ -201,13 +203,15 @@ class Handler(BaseHTTPRequestHandler):
             self.send(403, {"error": "Open MoneyTrail using its local address"})
             return
         url = urlparse(self.path)
-        static = {"/": ("index.html", "text/html"), "/index.html": ("index.html", "text/html"),
-                  "/app.js": ("app.js", "text/javascript"), "/theme.js": ("theme.js", "text/javascript"),
-                  "/bills.js": ("bills.js", "text/javascript"),
-                  "/style.css": ("style.css", "text/css")}
+        static = {"/": (TEMPLATE_DIR / "index.html", "text/html"),
+                  "/index.html": (TEMPLATE_DIR / "index.html", "text/html"),
+                  "/app.js": (STATIC_DIR / "app.js", "text/javascript"),
+                  "/theme.js": (STATIC_DIR / "theme.js", "text/javascript"),
+                  "/bills.js": (STATIC_DIR / "bills.js", "text/javascript"),
+                  "/style.css": (STATIC_DIR / "style.css", "text/css")}
         if url.path in static:
-            name, content_type = static[url.path]
-            self.send(200, (ROOT / name).read_bytes(), content_type + "; charset=utf-8")
+            path, content_type = static[url.path]
+            self.send(200, path.read_bytes(), content_type + "; charset=utf-8")
             return
         try:
             selected = parse_qs(url.query).get("dataset", [None])[0]
@@ -251,7 +255,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/import":
                 selected, duplicate = self.server.store.import_csv(data.get("name"), data.get("csv"))
             elif self.path == "/api/demo":
-                selected, duplicate = self.server.store.import_csv("Student demo", (ROOT / "examples" / "demo.csv").read_text(encoding="utf-8"))
+                selected, duplicate = self.server.store.import_csv(
+                    "Student demo", (ROOT / "data" / "raw" / "demo.csv").read_text(encoding="utf-8"))
             elif self.path == "/api/transaction":
                 self.server.store.update(data)
                 selected = data["dataset_id"]

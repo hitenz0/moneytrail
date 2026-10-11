@@ -9,8 +9,8 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from app import Store, make_server
-from bills import BillConflictError
+from src.app import Store, make_server
+from src.bills import BillConflictError
 
 
 TODAY = date(2026, 10, 10)

@@ -15,7 +15,8 @@ class Element {
     focus() {}
 }
 
-const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+const source = path.join(__dirname, '..', 'src');
+const html = fs.readFileSync(path.join(source, 'templates', 'index.html'), 'utf8');
 const elements = Object.fromEntries([...html.matchAll(/id="([^"]+)"/g)].map((match) => [match[1], new Element()]));
 const posted = [];
 const first = {id: 1, version: 1, name: 'Music', amount: '199.00', cadence: 'monthly', next_due: '2026-10-12',
@@ -38,8 +39,8 @@ const context = vm.createContext({Date: Today, Intl,
         if (options.body) { posted.push(JSON.parse(options.body)); return {ok: true, json: async () => nextPost}; }
         return {ok: true, json: async () => url.startsWith('/api/bills') ? initial : {datasets: [], report: null}};
     }});
-vm.runInContext(fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8'), context);
-vm.runInContext(fs.readFileSync(path.join(__dirname, 'bills.js'), 'utf8'), context);
+vm.runInContext(fs.readFileSync(path.join(source, 'static', 'app.js'), 'utf8'), context);
+vm.runInContext(fs.readFileSync(path.join(source, 'static', 'bills.js'), 'utf8'), context);
 
 async function main() {
     await new Promise(setImmediate);

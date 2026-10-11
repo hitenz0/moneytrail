@@ -1,7 +1,15 @@
 const $ = (id) => document.getElementById(id);
-const currency = new Intl.NumberFormat("en-IN", {style: "currency", currency: "INR"});
+const currency = new Intl.NumberFormat("en-IN", {style: "currency", currency: "INR", minimumFractionDigits: 0, maximumFractionDigits: 2});
 const money = (value) => currency.format(Number(value));
+const calendarDate = new Intl.DateTimeFormat("en-IN", {day: "numeric", month: "short", year: "numeric", timeZone: "UTC"});
+const formatDate = (value) => calendarDate.format(new Date(value + "T00:00:00Z"));
+const PAGE_SIZE = 25;
 let state = {datasets: [], report: null};
+let transactionIndex = new Map();
+let transactionRows = [];
+let suggestionsByRefund = new Map();
+let transactionPage = 0;
+let filteredCount = 0;
 let editing = null;
 let busy = false;
 let watchlistDay = "";
@@ -34,11 +42,11 @@ async function request(path, body) {
             method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)
         });
     } catch {
-        throw new Error("Cannot reach MoneyTrail. Start python app.py and reload this page.");
+        throw new Error("Cannot reach MoneyTrail. Start python -m src.app and reload this page.");
     }
     let data;
     try { data = await response.json(); }
-    catch { throw new Error("Start python app.py, then open the address it prints to use this page."); }
+    catch { throw new Error("Start python -m src.app, then open the address it prints to use this page."); }
     if (!response.ok) throw new Error(data.error || "Something went wrong. Please try again.");
     return data;
 }
@@ -46,17 +54,33 @@ async function request(path, body) {
 async function action(work) {
     if (busy) return;
     busy = true;
-    document.querySelectorAll("button:not([data-theme-choice]), input, select, textarea").forEach((node) => node.disabled = true);
+    $("main").setAttribute("aria-busy", "true");
+    const controls = [...document.querySelectorAll("button:not([data-theme-choice]), input, select, textarea")]
+        .map((node) => ({node, disabled: node.disabled}));
+    controls.forEach(({node}) => node.disabled = true);
     try { await work(); }
     catch (error) { notice(error.message, true); }
     finally {
         busy = false;
-        document.querySelectorAll("button:not([data-theme-choice]), input, select, textarea").forEach((node) => node.disabled = false);
+        controls.forEach(({node, disabled}) => node.disabled = disabled);
+        $("main").setAttribute("aria-busy", "false");
+        updatePageControls();
     }
 }
 
 function useState(data) {
+    if (data.report?.dataset.id !== state.report?.dataset.id) transactionPage = 0;
     state = data;
+    transactionIndex = new Map();
+    transactionRows = (data.report?.transactions || []).map((row) => {
+        transactionIndex.set(row.id, row);
+        return {row, search: [row.id, row.description, row.account, row.category || "Uncategorized"].join(" ").toLowerCase()};
+    }).sort((a, b) => b.row.date.localeCompare(a.row.date));
+    suggestionsByRefund = new Map();
+    (data.report?.refund_suggestions || []).forEach((item) => {
+        if (!suggestionsByRefund.has(item.refund_id)) suggestionsByRefund.set(item.refund_id, []);
+        suggestionsByRefund.get(item.refund_id).push(item);
+    });
     try { localStorage.setItem("moneytrail-dataset", state.report?.dataset.id || ""); } catch {}
     render();
 }
@@ -77,13 +101,11 @@ function render() {
     $("dataset").value = report?.dataset.id || "";
     $("empty").hidden = Boolean(report);
     $("dashboard").hidden = !report;
-    const bills = document.querySelector(".bills-section");
-    if (report) $("transactions-section").before(bills);
-    else $("dashboard").after(bills);
+    $("transactions-section").hidden = !report;
+    $("dashboard-nav").hidden = !report;
     if (!report) return;
     $("dataset-name").textContent = report.dataset.name;
-    const dates = report.transactions.map((row) => row.date).sort();
-    $("dataset-meta").textContent = dates[0] + " to " + dates.at(-1) + " · " + report.transactions.length + " transactions · Saved on this computer";
+    $("dataset-meta").textContent = formatDate(transactionRows.at(-1).row.date) + " – " + formatDate(transactionRows[0].row.date) + " · " + report.transactions.length + " transactions";
     $("export").href = "/api/export?dataset=" + report.dataset.id;
     for (const key of ["purchases", "refunds", "net"]) $(key).textContent = money(report.summary[key]);
     $("still-due").textContent = money(report.summary.still_due);
@@ -97,17 +119,33 @@ function renderCategories() {
     $("categories").replaceChildren();
     const entries = Object.entries(state.report.categories).sort((a, b) => Number(b[1]) - Number(a[1]));
     if (!entries.length) $("categories").append(element("p", "No purchases in this import.", "note"));
-    entries.forEach(([name, amount]) => {
+    $("category-count").textContent = entries.length;
+    const segments = [];
+    let offset = 0;
+    entries.forEach(([name, amount], index) => {
+        const share = Number(amount) / Number(state.report.summary.purchases) * 100;
+        const color = `var(--chart-${index % 5 + 1})`;
+        segments.push(`${color} ${offset}% ${offset + share}%`);
+        offset += share;
         const row = element("div", undefined, "category-row");
+        row.style.setProperty("--category-color", color);
         const label = element("div", undefined, "category-label");
-        label.append(element("span", name), element("strong", money(amount)));
+        const nameLabel = element("span", undefined, "category-name");
+        const dot = element("span", undefined, "category-dot");
+        dot.setAttribute("aria-hidden", "true");
+        nameLabel.append(dot, element("span", name));
+        const value = element("strong", money(amount));
+        value.append(element("span", Math.round(share) + "%", "category-share"));
+        label.append(nameLabel, value);
         const track = element("div", undefined, "track");
         const fill = element("div", undefined, "fill");
-        fill.style.width = Number(amount) / Number(state.report.summary.purchases) * 100 + "%";
+        fill.style.width = share + "%";
+        fill.style.background = color;
         track.append(fill);
         row.append(label, track);
         $("categories").append(row);
     });
+    $("category-donut").style.setProperty("--segments", segments.join(", ") || "var(--track) 0% 100%");
 }
 
 function refundTiming(item, now = new Date()) {
@@ -116,7 +154,7 @@ function refundTiming(item, now = new Date()) {
     const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
     const due = new Date(item.refund_due + "T00:00:00Z");
     const days = Math.round((today - due.getTime()) / 86400000);
-    const expected = "Expected " + new Intl.DateTimeFormat("en-IN", {day: "numeric", month: "short", year: "numeric", timeZone: "UTC"}).format(due);
+    const expected = "Expected " + calendarDate.format(due);
     const overdue = Number(item.remaining) > 0 && days > 0;
     const suffix = overdue ? " · " + days + (days === 1 ? " day overdue" : " days overdue") :
         Number(item.remaining) > 0 && days === 0 ? " · Due today" : "";
@@ -126,13 +164,16 @@ function refundTiming(item, now = new Date()) {
 function renderWatchlist() {
     watchlistDay = new Date().toDateString();
     const items = state.report.watchlist;
-    const overdueCount = items.filter((item) => refundTiming(item).overdue).length;
+    const timed = items.map((item) => ({item, timing: refundTiming(item)}));
+    const overdueCount = timed.filter(({timing}) => timing.overdue).length;
     $("watch-count").textContent = items.filter((item) => Number(item.remaining) > 0).length + " OPEN · " + overdueCount + " OVERDUE";
     $("watchlist").replaceChildren();
     const overdueOnly = $("watch-filter").value === "overdue";
-    const visible = overdueOnly ? items.filter((item) => refundTiming(item).overdue) : items;
+    const priority = ({item, timing}) => Number(item.remaining) === 0 ? 2 : timing.overdue ? 0 : 1;
+    const visible = (overdueOnly ? timed.filter(({timing}) => timing.overdue) : timed)
+        .sort((a, b) => priority(a) - priority(b));
     if (!visible.length) $("watchlist").append(element("p", overdueOnly ? "No overdue refunds. Choose All tracked refunds to see the full watchlist." : "Expecting a refund? Edit a purchase below and enter how much you expect back.", "note"));
-    visible.forEach((item) => {
+    visible.forEach(({item, timing}) => {
         const block = element("div", undefined, "watch-item");
         const heading = element("div", undefined, "watch-heading");
         heading.append(element("strong", item.description), element("span", item.status, "status " + (item.status === "Received" ? "received" : "")));
@@ -144,7 +185,6 @@ function renderWatchlist() {
         track.append(fill);
         const actions = element("div", undefined, "watch-actions");
         actions.append(button("Edit refund details", () => openEdit(item.id)));
-        const timing = refundTiming(item);
         const expected = element("p", timing.label, timing.overdue ? "refund-timing overdue" : "refund-timing note");
         block.append(heading, expected, amounts, track);
         if (item.refund_note) block.append(element("p", item.refund_note, "refund-note note small"));
@@ -164,9 +204,9 @@ function renderReview() {
         const info = element("div");
         info.append(element("strong", row.description + " · " + money(row.amount)), element("p", row.date + " · " + row.account + " · " + row.id, "note small"));
         const options = element("div", undefined, "review-options");
-        const suggestions = state.report.refund_suggestions.filter((item) => item.refund_id === row.id);
+        const suggestions = suggestionsByRefund.get(row.id) || [];
         suggestions.forEach((item) => {
-            const purchase = rows.find((row) => row.id === item.purchase_id);
+            const purchase = transactionIndex.get(item.purchase_id);
             const choice = element("div", undefined, "review-option");
             choice.append(button("Confirm link to " + purchase.description + " (" + purchase.id + ")", () => action(() => save(row, {refund_for: purchase.id})), "compact"));
             choice.append(element("p", "Shared word: " + item.shared_words.join(", ") + " · date and amount fit", "note"));
@@ -179,28 +219,44 @@ function renderReview() {
     });
 }
 
+function updatePageControls() {
+    $("prev-page").disabled = busy || transactionPage === 0;
+    $("next-page").disabled = busy || (transactionPage + 1) * PAGE_SIZE >= filteredCount;
+}
+
+function filterTransactions() {
+    transactionPage = 0;
+    renderTransactions();
+}
+
 function renderTransactions() {
     if (!state.report) return;
     const search = $("search").value.toLowerCase().trim();
     const kind = $("kind").value;
-    const rows = state.report.transactions.filter((row) => (!kind || row.kind === kind) &&
-        [row.id, row.description, row.account, row.category || "Uncategorized"].join(" ").toLowerCase().includes(search));
-    rows.sort((a, b) => b.date.localeCompare(a.date));
-    $("transaction-count").textContent = "Showing " + rows.length + " of " + state.report.transactions.length;
-    $("transactions").replaceChildren();
+    const rows = transactionRows.filter((entry) => (!kind || entry.row.kind === kind) && entry.search.includes(search));
+    filteredCount = rows.length;
+    const pages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
+    transactionPage = Math.min(transactionPage, pages - 1);
+    const start = transactionPage * PAGE_SIZE;
+    $("transaction-count").textContent = filteredCount ?
+        `${start + 1}–${Math.min(start + PAGE_SIZE, filteredCount)} of ${filteredCount}` + (search || kind ? " matching transactions" : " transactions") : "No matches";
+    $("pagination").hidden = pages <= 1;
+    $("page-label").textContent = `Page ${transactionPage + 1} of ${pages}`;
+    updatePageControls();
+    const tableRows = [];
     if (!rows.length) {
         const row = element("tr");
         const cell = element("td", "No matching transactions. Try a different search or transaction type.", "note");
         cell.colSpan = 6;
         row.append(cell);
-        $("transactions").append(row);
+        tableRows.push(row);
     }
-    rows.forEach((row) => {
+    rows.slice(start, start + PAGE_SIZE).forEach(({row}) => {
         const tr = element("tr");
-        const date = element("td", row.date);
+        const date = element("td", formatDate(row.date));
         date.append(element("span", row.id, "note"));
         const description = element("td", row.description);
-        description.append(element("span", row.kind, "note"));
+        description.append(element("span", row.kind, "note transaction-kind"));
         const category = element("td");
         if (row.kind === "purchase") {
             category.append(element("span", row.category || "Uncategorized"));
@@ -214,12 +270,13 @@ function renderTransactions() {
         const actions = element("td");
         if (row.kind !== "transfer") actions.append(button("Edit", () => openEdit(row.id)));
         tr.append(date, description, element("td", row.account), category, amount, actions);
-        $("transactions").append(tr);
+        tableRows.push(tr);
     });
+    $("transactions").replaceChildren(...tableRows);
 }
 
 function openEdit(id) {
-    editing = state.report.transactions.find((row) => row.id === id);
+    editing = transactionIndex.get(id);
     $("edit-title").textContent = editing.kind === "purchase" ? "Edit purchase" : "Review refund link";
     $("edit-description").textContent = editing.description;
     $("edit-details").textContent = editing.date + " · " + editing.account + " · " + money(editing.amount) + " · " + editing.id;
@@ -235,7 +292,7 @@ function openEdit(id) {
     $("edit-due").value = purchase ? editing.refund_due || "" : "";
     $("edit-note").value = purchase ? editing.refund_note || "" : "";
     $("edit-link").replaceChildren(new Option("Unlinked", ""));
-    state.report.transactions.filter((row) => row.kind === "purchase" && row.date <= editing.date).forEach((row) => {
+    if (!purchase) state.report.transactions.filter((row) => row.kind === "purchase" && row.date <= editing.date).forEach((row) => {
         $("edit-link").append(new Option(row.description + " · " + row.date + " · " + money(-Number(row.amount)) + " (" + row.id + ")", row.id));
     });
     $("edit-link").value = editing.refund_for;
@@ -258,8 +315,14 @@ $("edit-form").addEventListener("submit", (event) => {
 });
 $("close-dialog").addEventListener("click", () => $("edit-dialog").close());
 $("cancel-dialog").addEventListener("click", () => $("edit-dialog").close());
-$("search").addEventListener("input", renderTransactions);
-$("kind").addEventListener("change", renderTransactions);
+$("search").addEventListener("input", filterTransactions);
+$("kind").addEventListener("change", filterTransactions);
+$("prev-page").addEventListener("click", () => {
+    if (transactionPage > 0) { transactionPage--; renderTransactions(); }
+});
+$("next-page").addEventListener("click", () => {
+    if ((transactionPage + 1) * PAGE_SIZE < filteredCount) { transactionPage++; renderTransactions(); }
+});
 $("watch-filter").addEventListener("change", renderWatchlist);
 // Refresh overnight without rebuilding focused controls every minute.
 function refreshWatchlistDate() {

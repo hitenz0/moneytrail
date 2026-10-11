@@ -1,5 +1,6 @@
 __pycache__/
 *.db
-data/
+data/processed/*
+!data/processed/.gitkeep
 *.db-shm
 *.db-wal

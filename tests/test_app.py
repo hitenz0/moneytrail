@@ -9,11 +9,11 @@ from contextlib import closing
 from decimal import Decimal
 from pathlib import Path
 
-from app import ConflictError, ROOT, Store, make_server, to_csv
-from main import FIELDS, parse_transactions
+from src.app import ConflictError, ROOT, Store, make_server, to_csv
+from src.main import FIELDS, parse_transactions
 
 
-DEMO = (ROOT / "examples" / "demo.csv").read_text(encoding="utf-8")
+DEMO = (ROOT / "data" / "raw" / "demo.csv").read_text(encoding="utf-8")
 
 
 class StoreTests(unittest.TestCase):

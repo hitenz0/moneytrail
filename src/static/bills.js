@@ -25,8 +25,7 @@ function useBills(data) {
 }
 
 function billDateLabel(value) {
-    return new Intl.DateTimeFormat("en-IN", {day: "numeric", month: "short", year: "numeric"})
-        .format(new Date(value + "T12:00:00"));
+    return formatDate(value);
 }
 
 function billStatus(item) {
@@ -34,7 +33,7 @@ function billStatus(item) {
     if (item.status === "paid") return ["Paid", "received"];
     if (item.days_until < 0) return [item.payment_method === "autopay" ? "Check autopay" : "Past due", "bill-late"];
     if (item.days_until === 0) return ["Due today", "bill-soon"];
-    if (item.days_until < 7) return ["Due in " + item.days_until + " days", "bill-soon"];
+    if (item.days_until < 7) return [item.days_until === 1 ? "Due tomorrow" : "Due in " + item.days_until + " days", "bill-soon"];
     return ["Upcoming", ""];
 }
 

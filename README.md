@@ -2,22 +2,27 @@
 
 I use UPI and a credit card, and it can be hard to see where small spends went or whether a refund actually came back. MoneyTrail is a project I'm building around those two questions.
 
+![MoneyTrail dashboard in dark mode, showing synthetic spending and refund data](docs/preview-dark.png)
+
+Black and green in dark mode, with a separate light palette. [View the light theme](docs/preview-light.png). The previews use the student demo after a few review actions; all data shown is synthetic.
+
 ## Run the web app
 
 Requires Python 3.10 or newer. There are no extra packages to install.
 
 ```powershell
-python app.py
+python -m src.app
 ```
 
-Open [MoneyTrail](http://127.0.0.1:8001) in your browser. Keep the terminal running; Ctrl+C stops the server. If the port is busy, run `python app.py --port 8002` and use the address it prints. Opening `index.html` directly or using a plain static server will not run the app.
+Open [MoneyTrail](http://127.0.0.1:8001) in your browser. Keep the terminal running; Ctrl+C stops the server. If the port is busy, run `python -m src.app --port 8002` and use the address it prints. Opening the HTML file directly or using a plain static server will not run the app.
 
 ## What works
 
 - Switch between light and dark mode in the header. The app starts with your device's theme and remembers your choice in this browser.
 - Import a transaction CSV and switch between saved imports.
 - See purchases, refund credits, net spending, and refunds still due.
-- See spending by category, search transactions, and filter by transaction type.
+- See category amounts and percentages with a spending breakdown chart.
+- Search transactions and filter by type. Large imports show 25 rows per page; phone layouts keep amounts and actions visible without sideways scrolling.
 - Accept a category suggestion or enter your own category.
 - Mark a purchase as expecting a full or partial refund.
 - Set an expected refund date, keep a short note, and filter the watchlist to overdue refunds.
@@ -77,28 +82,51 @@ The watchlist uses only confirmed links. It supports several credits for one pur
 
 Category suggestions use a small keyword list. Ambiguous or unknown descriptions remain Uncategorized until reviewed. Refund suggestions need a shared description word, a refund date on or after the purchase, and an amount no larger than what is still due. These clues can miss a real match or suggest the wrong purchase; the user makes the final choice.
 
+## Project structure
+
+```text
+money/
+├── data/
+│   ├── processed/        # Local exports and generated data (Git-ignored)
+│   └── raw/              # Synthetic CSV examples
+├── docs/                 # README preview images
+├── src/
+│   ├── static/           # Browser JavaScript and CSS
+│   ├── templates/        # HTML page
+│   ├── app.py            # Local server and SQLite storage
+│   ├── bills.py          # Bill scheduling rules
+│   └── main.py           # CSV parsing and spending calculations
+├── tests/                # Python and browser-logic checks
+├── .gitignore
+└── README.md
+```
+
 ## How the code fits together
 
 | File | Job |
 | --- | --- |
-| `main.py` | Parse CSVs and calculate totals, categories, watchlists, and suggestions |
-| `app.py` | Serve the local API and save imports and edits in SQLite |
-| `app.js` | Load API results and handle browser actions |
-| `index.html`, `style.css` | Page structure and appearance |
-| `test_main.py`, `test_app.py` | Calculation, command-line, storage, and API checks |
+| `src/main.py` | Parse CSVs and calculate totals, categories, watchlists, and suggestions |
+| `src/app.py` | Serve the local API and save imports and edits in SQLite |
+| `src/static/app.js` | Load API results and handle browser actions |
+| `src/bills.py`, `src/static/bills.js` | Save bill schedules, handle recurrence, and render payment deadlines |
+| `src/static/theme.js` | Apply and remember light or dark mode before the page paints |
+| `src/templates/index.html`, `src/static/style.css` | Page structure and appearance |
+| `tests/` | Calculation, storage, API, recurrence, and browser logic checks |
 
 The browser asks Python for the report. Saving an edit validates it, writes it to SQLite, and recalculates the report. Money calculations use Python's `Decimal`. If two tabs edit the same import, a stale save is rejected so it cannot quietly overwrite a newer edit.
+
+Refund suggestions index merchant words once and compare only purchases that share a word. The browser caches sorted transactions and searchable text for each loaded report, then renders one page at a time. These are performance changes; refund matching rules and full-import totals are the same.
 
 ## Terminal version
 
 The original terminal report still works:
 
 ```powershell
-python main.py
-python main.py examples/unlinked_refund.csv
-python main.py examples/uncategorized.csv
-python main.py "D:\statements\october transactions.csv"
-python main.py --help
+python -m src.main
+python -m src.main data/raw/unlinked_refund.csv
+python -m src.main data/raw/uncategorized.csv
+python -m src.main "D:\statements\october transactions.csv"
+python -m src.main --help
 ```
 
 This command reads a CSV without changing it. It does not read edits saved in the web app unless you download the reviewed CSV and pass that file.
@@ -106,15 +134,15 @@ This command reads a CSV without changing it. It does not read edits saved in th
 ## Checks
 
 ```powershell
-python -m unittest -v
+python -m unittest discover -s tests -v
 ```
 
 Tests use temporary databases and synthetic data. They cover partial refunds, duplicate imports, persistence, invalid updates, stale edits, CSV export, and the HTTP API.
 
-If Node.js is available, run `node test_frontend.cjs` for theme switching and persistence, date labels, the overdue filter, and edit-form checks. These use a small simulated DOM; they do not replace a visual browser check. The app itself still only requires Python.
+If Node.js is available, run `node tests/test_frontend.cjs` for theme persistence, refund dates, edit forms, pagination, search, and control states during saves. These use a small simulated DOM; they do not replace a visual browser check. The app itself still only requires Python.
 
-Run `node test_bills_frontend.cjs` to check the bill filters, autopay label, and edit actions in a simulated DOM.
+Run `node tests/test_bills_frontend.cjs` to check the bill filters, autopay label, and edit actions in a simulated DOM.
 
 ## Current scope
 
-This is a local app for one person, bound to 127.0.0.1. It has no bank connection, login system, or public hosting. Imports are separate workspaces rather than a combined account history. Bill dates are entered manually, and the app does not send notifications. The interface is a working starting point; the visual design is still being developed.
+This is a local app for one person, bound to 127.0.0.1. It has no bank connection, login system, or public hosting. Imports are separate workspaces rather than a combined account history. Bill dates are entered manually, and the app does not send notifications.

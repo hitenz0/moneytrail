@@ -1,4 +1,5 @@
 import csv
+import random
 import subprocess
 import sys
 import tempfile
@@ -6,8 +7,8 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 
-from main import (FILE, load_transactions, refund_watchlist, spending_by_category,
-                  suggest_category, suggest_refund_links, summarize)
+from src.main import (FILE, description_words, load_transactions, refund_watchlist,
+                      spending_by_category, suggest_category, suggest_refund_links, summarize)
 
 
 class RefundWatchlistTests(unittest.TestCase):
@@ -120,6 +121,35 @@ class RefundWatchlistTests(unittest.TestCase):
         self.assertEqual([item["purchase_id"] for item in suggest_refund_links(self.load_rows())],
                          ["t1", "t3"])
 
+    def test_indexed_suggestions_match_exhaustive_matching(self):
+        rng = random.Random(42)
+        rows = []
+        for index in range(60):
+            rows.append({"id": f"p{index}", "kind": "purchase", "refund_for": "",
+                         "description": f"SHOP{rng.randrange(8)} BRAND{rng.randrange(5)}",
+                         "date": f"2026-09-{rng.randrange(1, 20):02d}",
+                         "amount": Decimal(-100), "refund_expected": Decimal(rng.choice([0, 30, 100]))})
+            rows.append({"id": f"r{index}", "kind": "refund", "refund_expected": Decimal(0),
+                         "description": f"SHOP{rng.randrange(8)} BRAND{rng.randrange(5)} REFUND",
+                         "date": f"2026-09-{rng.randrange(10, 29):02d}",
+                         "amount": Decimal(rng.choice([20, 30, 50])),
+                         "refund_for": f"p{index}" if index % 4 == 0 else ""})
+        rng.shuffle(rows)
+        waiting = {item["id"]: item["remaining"] for item in refund_watchlist(rows)}
+        expected = []
+        for refund in rows:
+            if refund["kind"] != "refund" or refund["refund_for"]:
+                continue
+            for purchase in rows:
+                shared = description_words(refund["description"]) & description_words(purchase["description"])
+                if (purchase["kind"] == "purchase" and shared and
+                        refund["date"] >= purchase["date"] and
+                        refund["amount"] <= waiting.get(purchase["id"], 0)):
+                    expected.append({"refund_id": refund["id"], "purchase_id": purchase["id"],
+                                     "amount": refund["amount"], "shared_words": sorted(shared)})
+        self.assertEqual(suggest_refund_links(rows), expected)
+        self.assertEqual(suggest_refund_links(rows, refund_watchlist(rows)), expected)
+
     def test_reject_invalid_date(self):
         self.rows[4]["date"] = "2026-09-99"
         with self.assertRaisesRegex(ValueError, "Line 6"):
@@ -150,7 +180,7 @@ class CommandLineTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.folder = Path(self.temp.name)
-        self.script = Path(__file__).with_name("main.py").resolve()
+        self.script = Path(__file__).resolve().parent.parent / "src" / "main.py"
 
     def run_script(self, *args):
         return subprocess.run([sys.executable, str(self.script), *args], cwd=self.folder,

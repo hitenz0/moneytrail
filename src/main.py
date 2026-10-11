@@ -9,7 +9,8 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 
-FILE = Path(__file__).with_name("sample_transactions.csv")
+ROOT = Path(__file__).resolve().parent.parent
+FILE = ROOT / "data" / "raw" / "sample_transactions.csv"
 FIELDS = ["id", "date", "description", "amount", "account", "kind", "category",
           "refund_expected", "refund_for"]
 FOLLOWUP_FIELDS = ["refund_due", "refund_note"]
@@ -154,18 +155,31 @@ def description_words(description):
     return {word for word in words if len(word) >= 4 and word not in COMMON_WORDS}
 
 
-def suggest_refund_links(transactions):
+def suggest_refund_links(transactions, watchlist=None):
     purchases = {row["id"]: row for row in transactions if row["kind"] == "purchase"}
-    waiting = [item for item in refund_watchlist(transactions) if item["remaining"] > 0]
+    waiting = [item for item in (refund_watchlist(transactions) if watchlist is None else watchlist)
+               if item["remaining"] > 0]
+    # Only compare purchases that share a merchant word; tokenize each one once.
+    words_by_purchase = []
+    purchases_by_word = {}
+    for index, item in enumerate(waiting):
+        words = description_words(purchases[item["id"]]["description"])
+        words_by_purchase.append(words)
+        for word in words:
+            purchases_by_word.setdefault(word, set()).add(index)
     suggestions = []
 
     for refund in transactions:
         if refund["kind"] != "refund" or refund["refund_for"]:
             continue
         refund_words = description_words(refund["description"])
-        for item in waiting:
+        candidates = set()
+        for word in refund_words:
+            candidates.update(purchases_by_word.get(word, ()))
+        for index in sorted(candidates):
+            item = waiting[index]
             purchase = purchases[item["id"]]
-            shared_words = refund_words & description_words(purchase["description"])
+            shared_words = refund_words & words_by_purchase[index]
             if (refund["date"] >= purchase["date"] and
                     refund["amount"] <= item["remaining"] and shared_words):
                 suggestions.append({"refund_id": refund["id"], "purchase_id": purchase["id"],
