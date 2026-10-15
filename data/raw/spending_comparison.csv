@@ -1,0 +1,15 @@
+id,date,description,amount,account,kind,category,refund_expected,refund_for
+s1,2026-08-01,Canteen lunch,-150.00,UPI,purchase,Food,,
+s2,2026-08-08,Food delivery,-250.00,UPI,purchase,Food,,
+s3,2026-08-12,Bus pass,-600.00,UPI,purchase,Transport,,
+s4,2026-08-16,Notebook,-200.00,UPI,purchase,Study,,
+s5,2026-08-28,Music plan,-99.00,UPI,purchase,Subscriptions,,
+s6,2026-09-01,Canteen lunch,-180.00,UPI,purchase,Food,,
+s7,2026-09-05,Food delivery,-320.00,UPI,purchase,Food,,
+s8,2026-09-09,Cafe,-250.00,UPI,purchase,Food,,
+s9,2026-09-12,Food delivery,-450.00,UPI,purchase,Food,,
+s10,2026-09-15,Bus tickets,-300.00,UPI,purchase,Transport,,
+s11,2026-09-18,Headphones,-2000.00,UPI,purchase,Shopping,500.00,
+s12,2026-09-22,Headphones partial refund,500.00,UPI,refund,,,s11
+s13,2026-09-25,Card bill payment,-3000.00,UPI,transfer,,,
+s14,2026-09-28,Music plan,-99.00,UPI,purchase,Subscriptions,,

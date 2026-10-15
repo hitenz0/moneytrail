@@ -19,11 +19,15 @@ Open [MoneyTrail](http://127.0.0.1:8001) in your browser. Keep the terminal runn
 ## What works
 
 - Switch between light and dark mode in the header. The app starts with your device's theme and remembers your choice in this browser.
+- Install MoneyTrail from a supported browser when the **Install app** button appears.
 - Import a transaction CSV and switch between saved imports.
+- Import a bank statement CSV by mapping its date, description, and amount columns, with a preview before saving.
 - See purchases, refund credits, net spending, and refunds still due.
 - See category amounts and percentages with a spending breakdown chart.
-- Search transactions and filter by type. Large imports show 25 rows per page; phone layouts keep amounts and actions visible without sideways scrolling.
+- Compare equal-length periods to see category changes, purchase counts, average costs, and the transactions behind each change.
+- Search transactions, clear active filters in one click, and filter by colored transaction type. Large imports show 25 rows per page; phone layouts keep amounts and actions visible without sideways scrolling.
 - Accept a category suggestion or enter your own category.
+- Correct a transaction type when a statement description was classified incorrectly; transfers stay out of spending totals.
 - Mark a purchase as expecting a full or partial refund.
 - Set an expected refund date, keep a short note, and filter the watchlist to overdue refunds.
 - Add one-time bills or recurring subscriptions, see what's due over the next seven days, and flag past-due payments.
@@ -31,6 +35,16 @@ Open [MoneyTrail](http://127.0.0.1:8001) in your browser. Keep the terminal runn
 - Download a CSV containing your reviewed categories and refund links.
 
 Edits are saved in `data/moneytrail.db`, a local SQLite database excluded from Git. Reloading the page or restarting the server keeps your work. The original CSV is not changed. Reimporting the same original transaction data reopens its saved workspace, including edits; a different import gets a separate workspace. Links stay within one import, so include the purchase and its later refund in the same CSV.
+
+## What changed in my spending?
+
+Below the refund panels, choose an earlier and a later period in **What changed in my spending?** You can compare two saved imports or two periods from one import. Dates initially cover 28 days ending at the import's latest transaction. Adjust them to your statement coverage, then click **Compare spending**. **Use preceding period** sets the earlier dates to the same number of days immediately before the later period, keeping your selected imports.
+
+Periods must have equal numbers of calendar days and cannot overlap. For example, compare September 1–28 with August 1–28. Use statements covering the same accounts. Transaction dates alone cannot prove a statement is complete; the app flags empty windows, windows extending beyond recorded dates, and different account names.
+
+Categories appear in order of the largest absolute change. Each shows the earlier and later totals, purchase count, average purchase cost, and a plain explanation. Expand either period to inspect the purchases, sorted by amount. Categories load eight at a time and expanded transaction lists show 25 at a time. Refund credits are shown separately and affect net spending on the date received; expected refunds and transfers do not count as purchases. Comparisons read saved category edits and never merge or modify imports.
+
+To try it with synthetic data, import `data/raw/spending_comparison.csv`. Select that import on both sides, set **August 1–28, 2026** and **September 1–28, 2026**, then compare. Food rises from INR 400 across two purchases to INR 1,200 across four; a single INR 2,000 headphones purchase appears under Shopping. Purchases rise INR 2,300, while a separate INR 500 refund makes the net increase INR 1,800.
 
 ## Bills and subscriptions
 
@@ -55,7 +69,11 @@ The demo is saved too. Loading it again reopens your edited copy.
 
 ## CSV format
 
-Use UTF-8 text, dates like `2026-09-05`, and these columns:
+You can also import a bank export without rewriting its headers. Choose **Import CSV** and select the file. If it is not already in MoneyTrail's format, the column mapper opens. Select the date format, the date and description columns, either separate debit/credit columns or one signed amount column, and an account name. Click **Preview rows** to validate the full file and inspect the first eight converted transactions, then **Import statement**. Try `data/raw/bank_statement_example.csv` with the suggested mapping. The account name is a label in MoneyTrail, not a bank connection.
+
+The mapper treats debits as purchases unless the description clearly says card-bill payment or self-transfer. A positive credit is a refund only when its description says refund, reversal, cashback, or chargeback; other credits are transfers and do not reduce spending. Check the preview and your bank export before importing. After import, use **Edit** on any transaction to correct its type. Changing type clears category or refund details that no longer apply; unlink any other refunds pointing to a purchase before changing that purchase into a transfer. Date order must be selected explicitly for ambiguous dates. This first version supports UTF-8 comma-separated files with a header row and up to 10,000 rows; it does not read PDF statements or connect to a bank.
+
+MoneyTrail's original CSV format still works directly. Use UTF-8 text, dates like `2026-09-05`, and these columns:
 
 ```csv
 id,date,description,amount,account,kind,category,refund_expected,refund_for
@@ -106,7 +124,9 @@ money/
 | File | Job |
 | --- | --- |
 | `src/main.py` | Parse CSVs and calculate totals, categories, watchlists, and suggestions |
+| `src/statement_import.py`, `src/static/statement-import.js` | Map bank CSV columns and preview converted transactions |
 | `src/app.py` | Serve the local API and save imports and edits in SQLite |
+| `src/comparison.py`, `src/static/comparison.js` | Compare spending periods and show the supporting transactions |
 | `src/static/app.js` | Load API results and handle browser actions |
 | `src/bills.py`, `src/static/bills.js` | Save bill schedules, handle recurrence, and render payment deadlines |
 | `src/static/theme.js` | Apply and remember light or dark mode before the page paints |
@@ -142,6 +162,8 @@ Tests use temporary databases and synthetic data. They cover partial refunds, du
 If Node.js is available, run `node tests/test_frontend.cjs` for theme persistence, refund dates, edit forms, pagination, search, and control states during saves. These use a small simulated DOM; they do not replace a visual browser check. The app itself still only requires Python.
 
 Run `node tests/test_bills_frontend.cjs` to check the bill filters, autopay label, and edit actions in a simulated DOM.
+
+Run `node tests/test_comparison_frontend.cjs` for comparison date controls, evidence lists, errors, and stale response handling in a simulated DOM.
 
 ## Current scope
 

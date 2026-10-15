@@ -14,6 +14,8 @@ from urllib.parse import parse_qs, urlparse
 from datetime import date
 
 from .bills import BillConflictError, bill_date, bill_report, create_bill_table, save_bill
+from .comparison import compare, validate_periods
+from .statement_import import convert_statement, inspect_statement
 
 from .main import (FIELDS, FOLLOWUP_FIELDS, parse_transactions, refund_watchlist,
                    spending_by_category, suggest_category, suggest_refund_links, summarize)
@@ -73,7 +75,22 @@ class Store:
 
     def datasets(self, db):
         return [dict(row) for row in db.execute(
-            "SELECT id, name, version, created_at FROM datasets ORDER BY id DESC")]
+            """SELECT d.id, d.name, d.version, d.created_at,
+                      MIN(t.date) AS first_date, MAX(t.date) AS last_date
+               FROM datasets d LEFT JOIN transactions t ON t.dataset_id = d.id
+               GROUP BY d.id ORDER BY d.id DESC""")]
+
+    def comparison(self, data):
+        before, after = validate_periods(data)
+        with self.connect() as db:
+            db.execute("BEGIN")
+            datasets = {item["id"]: item for item in self.datasets(db)}
+            if any(period["dataset_id"] not in datasets for period in (before, after)):
+                raise ValueError("That import no longer exists")
+            before_rows = self.rows(db, before["dataset_id"])
+            after_rows = before_rows if before["dataset_id"] == after["dataset_id"] else self.rows(db, after["dataset_id"])
+        return compare(before_rows, after_rows, before, after,
+                       datasets[before["dataset_id"]], datasets[after["dataset_id"]])
 
     def bills(self, today):
         with self.connect() as db:
@@ -149,8 +166,8 @@ class Store:
         changes = data.get("changes")
         if type(dataset_id) is not int or type(version) is not int or not isinstance(transaction_id, str):
             raise ValueError("Choose a transaction from the current import")
-        if not isinstance(changes, dict) or not changes or not set(changes) <= {"category", "refund_expected", "refund_for", *FOLLOWUP_FIELDS}:
-            raise ValueError("Only category, refund details, and refund link can be edited")
+        if not isinstance(changes, dict) or not changes or not set(changes) <= {"kind", "category", "refund_expected", "refund_for", *FOLLOWUP_FIELDS}:
+            raise ValueError("Only transaction type, category, and refund details can be edited")
         if any(not isinstance(value, str) or len(value) > 200 for value in changes.values()):
             raise ValueError("Edits must be text of at most 200 characters")
         with self.connect() as db:
@@ -164,14 +181,26 @@ class Store:
             row = next((row for row in rows if row["id"] == transaction_id), None)
             if row is None:
                 raise ValueError("Transaction not found")
-            allowed = {"category", "refund_expected", *FOLLOWUP_FIELDS} if row["kind"] == "purchase" else {"refund_for"} if row["kind"] == "refund" else set()
+            target_kind = changes.get("kind", row["kind"])
+            if target_kind not in {"purchase", "refund", "transfer"}:
+                raise ValueError("Choose purchase, refund, or transfer")
+            allowed = {"kind"}
+            if target_kind == "purchase":
+                allowed.update({"category", "refund_expected", *FOLLOWUP_FIELDS})
+            elif target_kind == "refund":
+                allowed.add("refund_for")
             if not set(changes) <= allowed:
                 raise ValueError("That field does not apply to this transaction")
+            if target_kind != row["kind"]:
+                if target_kind != "purchase":
+                    row.update(category="", refund_expected=Decimal(0), refund_due="", refund_note="")
+                if target_kind != "refund":
+                    row["refund_for"] = ""
             row.update(changes)
             checked = parse_transactions(to_csv(rows))
             row = next(row for row in checked if row["id"] == transaction_id)
-            db.execute("UPDATE transactions SET category = ?, refund_expected = ?, refund_for = ?, refund_due = ?, refund_note = ? WHERE dataset_id = ? AND id = ?",
-                       (row["category"], str(row["refund_expected"]), row["refund_for"], row["refund_due"], row["refund_note"], dataset_id, transaction_id))
+            db.execute("UPDATE transactions SET kind = ?, category = ?, refund_expected = ?, refund_for = ?, refund_due = ?, refund_note = ? WHERE dataset_id = ? AND id = ?",
+                       (row["kind"], row["category"], str(row["refund_expected"]), row["refund_for"], row["refund_due"], row["refund_note"], dataset_id, transaction_id))
             db.execute("UPDATE datasets SET version = version + 1 WHERE id = ?", (dataset_id,))
 
 
@@ -206,8 +235,13 @@ class Handler(BaseHTTPRequestHandler):
         static = {"/": (TEMPLATE_DIR / "index.html", "text/html"),
                   "/index.html": (TEMPLATE_DIR / "index.html", "text/html"),
                   "/app.js": (STATIC_DIR / "app.js", "text/javascript"),
+                  "/comparison.js": (STATIC_DIR / "comparison.js", "text/javascript"),
+                  "/statement-import.js": (STATIC_DIR / "statement-import.js", "text/javascript"),
                   "/theme.js": (STATIC_DIR / "theme.js", "text/javascript"),
                   "/bills.js": (STATIC_DIR / "bills.js", "text/javascript"),
+                  "/install.js": (STATIC_DIR / "install.js", "text/javascript"),
+                  "/manifest.webmanifest": (STATIC_DIR / "manifest.webmanifest", "application/manifest+json"),
+                  "/icon.svg": (STATIC_DIR / "icon.svg", "image/svg+xml"),
                   "/style.css": (STATIC_DIR / "style.css", "text/css")}
         if url.path in static:
             path, content_type = static[url.path]
@@ -247,6 +281,16 @@ class Handler(BaseHTTPRequestHandler):
             data = json.loads(self.rfile.read(length))
             if not isinstance(data, dict):
                 raise ValueError("Expected a JSON object")
+            if self.path == "/api/compare":
+                self.send(200, self.server.store.comparison(data))
+                return
+            if self.path == "/api/import/inspect":
+                self.send(200, inspect_statement(data.get("csv")))
+                return
+            if self.path == "/api/import/preview":
+                converted = convert_statement(data.get("csv"), data.get("options"))
+                self.send(200, {key: value for key, value in converted.items() if key != "csv"})
+                return
             if self.path == "/api/bills":
                 today = bill_date(data.get("today"))
                 self.send(200, self.server.store.update_bill(data, today))
@@ -254,6 +298,9 @@ class Handler(BaseHTTPRequestHandler):
             duplicate = False
             if self.path == "/api/import":
                 selected, duplicate = self.server.store.import_csv(data.get("name"), data.get("csv"))
+            elif self.path == "/api/import/mapped":
+                converted = convert_statement(data.get("csv"), data.get("options"))
+                selected, duplicate = self.server.store.import_csv(data.get("name"), converted["csv"])
             elif self.path == "/api/demo":
                 selected, duplicate = self.server.store.import_csv(
                     "Student demo", (ROOT / "data" / "raw" / "demo.csv").read_text(encoding="utf-8"))

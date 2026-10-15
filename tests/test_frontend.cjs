@@ -19,6 +19,7 @@ class Element {
     setAttribute(name, value) { this.attributes[name] = value; }
     showModal() { this.open = true; }
     close() { this.open = false; }
+    focus() { this.focused = true; }
 }
 
 const source = path.join(__dirname, '..', 'src');
@@ -164,12 +165,24 @@ async function main() {
     assert.equal(posts[0].changes.refund_note, 'Merchant extended the date');
     assert.equal(elements['edit-dialog'].open, false);
 
+    state.report.transactions.push({...purchase, id: 't1', kind: 'transfer', amount: '-100', category: '', refund_expected: '0', refund_due: '', refund_note: ''});
+    context.useState(state);
+    context.openEdit('t1');
+    assert.equal(elements['edit-kind'].value, 'transfer');
+    assert.equal(elements['purchase-fields'].hidden, true);
+    elements['edit-kind'].value = 'purchase';
+    elements['edit-kind'].listeners.change();
+    assert.equal(elements['purchase-fields'].hidden, false);
+    state.report.transactions.pop();
+    context.useState(state);
+
     // Large imports render only one page; filters and dataset changes reset it.
     const large = {...state, report: {...state.report, dataset: {...dataset, id: 2}, watchlist: [],
         transactions: Array.from({length: 61}, (_, i) => ({...purchase, id: 'row-' + i,
             description: 'Merchant ' + i, date: '2026-09-' + String(i % 28 + 1).padStart(2, '0')}))}};
     context.useState(large);
     assert.equal(elements.transactions.children.length, 25);
+    assert.equal(elements.transactions.children[0].children[1].children[0].className, 'transaction-kind kind-purchase');
     assert.equal(elements['prev-page'].disabled, true);
     assert.equal(elements['next-page'].disabled, false);
     elements['next-page'].listeners.click();
@@ -184,6 +197,14 @@ async function main() {
     assert.equal(elements.transactions.children.length, 1);
     assert.equal(elements['prev-page'].disabled, true);
     assert.equal(elements.pagination.hidden, true);
+    assert.equal(elements['clear-filters'].hidden, false);
+    elements.kind.value = 'purchase';
+    elements['clear-filters'].listeners.click();
+    assert.equal(elements.search.value, '');
+    assert.equal(elements.kind.value, '');
+    assert.equal(elements.transactions.children.length, 25);
+    assert.equal(elements['clear-filters'].hidden, true);
+    assert.equal(elements.search.focused, true);
     elements.search.value = 'no such merchant';
     elements.search.listeners.input();
     assert.match(elements.transactions.children[0].children[0].textContent, /No matching transactions/);

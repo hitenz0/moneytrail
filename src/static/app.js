@@ -65,6 +65,7 @@ async function action(work) {
         controls.forEach(({node, disabled}) => node.disabled = disabled);
         $("main").setAttribute("aria-busy", "false");
         updatePageControls();
+        if (typeof syncComparisonControls === "function") syncComparisonControls();
     }
 }
 
@@ -103,6 +104,7 @@ function render() {
     $("dashboard").hidden = !report;
     $("transactions-section").hidden = !report;
     $("dashboard-nav").hidden = !report;
+    if (typeof updateComparison === "function") updateComparison(state);
     if (!report) return;
     $("dataset-name").textContent = report.dataset.name;
     $("dataset-meta").textContent = formatDate(transactionRows.at(-1).row.date) + " – " + formatDate(transactionRows[0].row.date) + " · " + report.transactions.length + " transactions";
@@ -233,6 +235,7 @@ function renderTransactions() {
     if (!state.report) return;
     const search = $("search").value.toLowerCase().trim();
     const kind = $("kind").value;
+    $("clear-filters").hidden = !search && !kind;
     const rows = transactionRows.filter((entry) => (!kind || entry.row.kind === kind) && entry.search.includes(search));
     filteredCount = rows.length;
     const pages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
@@ -256,7 +259,7 @@ function renderTransactions() {
         const date = element("td", formatDate(row.date));
         date.append(element("span", row.id, "note"));
         const description = element("td", row.description);
-        description.append(element("span", row.kind, "note transaction-kind"));
+        description.append(element("span", row.kind, "transaction-kind kind-" + row.kind));
         const category = element("td");
         if (row.kind === "purchase") {
             category.append(element("span", row.category || "Uncategorized"));
@@ -268,41 +271,50 @@ function renderTransactions() {
         } else category.append(element("span", "Excluded from spending", "note"));
         const amount = element("td", (Number(row.amount) > 0 ? "+" : "") + money(row.amount), "amount " + (row.kind === "refund" ? "credit" : ""));
         const actions = element("td");
-        if (row.kind !== "transfer") actions.append(button("Edit", () => openEdit(row.id)));
+        actions.append(button("Edit", () => openEdit(row.id)));
         tr.append(date, description, element("td", row.account), category, amount, actions);
         tableRows.push(tr);
     });
     $("transactions").replaceChildren(...tableRows);
 }
 
+function syncEditKind() {
+    const kind = $("edit-kind").value;
+    $("edit-title").textContent = kind === "purchase" ? "Edit purchase" : kind === "refund" ? "Review refund" : "Edit transfer";
+    $("purchase-fields").hidden = kind !== "purchase";
+    $("followup-fields").hidden = kind !== "purchase";
+    $("refund-fields").hidden = kind !== "refund";
+    $("edit-expected").required = kind === "purchase";
+}
+
 function openEdit(id) {
     editing = transactionIndex.get(id);
-    $("edit-title").textContent = editing.kind === "purchase" ? "Edit purchase" : "Review refund link";
     $("edit-description").textContent = editing.description;
     $("edit-details").textContent = editing.date + " · " + editing.account + " · " + money(editing.amount) + " · " + editing.id;
-    const purchase = editing.kind === "purchase";
-    $("purchase-fields").hidden = !purchase;
-    $("followup-fields").hidden = !purchase;
-    $("refund-fields").hidden = purchase;
-    $("edit-expected").required = purchase;
-    $("edit-expected").max = purchase ? String(-Number(editing.amount)) : "999999999.99";
-    $("edit-expected").value = purchase ? editing.refund_expected : "0";
+    const negative = Number(editing.amount) < 0;
+    $("edit-kind").replaceChildren(...(negative ? [["purchase", "Purchase"], ["transfer", "Transfer"]] : [["refund", "Refund"], ["transfer", "Transfer"]])
+        .map(([value, label]) => new Option(label, value)));
+    $("edit-kind").value = editing.kind;
+    $("edit-expected").max = negative ? String(-Number(editing.amount)) : "999999999.99";
+    $("edit-expected").value = editing.refund_expected;
     $("edit-category").value = editing.category;
-    $("edit-due").min = purchase ? editing.date : "";
-    $("edit-due").value = purchase ? editing.refund_due || "" : "";
-    $("edit-note").value = purchase ? editing.refund_note || "" : "";
+    $("edit-due").min = editing.date;
+    $("edit-due").value = editing.refund_due || "";
+    $("edit-note").value = editing.refund_note || "";
     $("edit-link").replaceChildren(new Option("Unlinked", ""));
-    if (!purchase) state.report.transactions.filter((row) => row.kind === "purchase" && row.date <= editing.date).forEach((row) => {
+    if (!negative) state.report.transactions.filter((row) => row.kind === "purchase" && row.date <= editing.date).forEach((row) => {
         $("edit-link").append(new Option(row.description + " · " + row.date + " · " + money(-Number(row.amount)) + " (" + row.id + ")", row.id));
     });
     $("edit-link").value = editing.refund_for;
+    syncEditKind();
     $("edit-error").hidden = true;
     $("edit-dialog").showModal();
 }
 
 $("edit-form").addEventListener("submit", (event) => {
     event.preventDefault();
-    const changes = editing.kind === "purchase" ? {category: $("edit-category").value.trim(), refund_expected: $("edit-expected").value, refund_due: $("edit-due").value, refund_note: $("edit-note").value.trim()} : {refund_for: $("edit-link").value};
+    const kind = $("edit-kind").value;
+    const changes = kind === "purchase" ? {kind, category: $("edit-category").value.trim(), refund_expected: $("edit-expected").value, refund_due: $("edit-due").value, refund_note: $("edit-note").value.trim()} : kind === "refund" ? {kind, refund_for: $("edit-link").value} : {kind};
     action(async () => {
         try {
             await save(editing, changes);
@@ -313,10 +325,17 @@ $("edit-form").addEventListener("submit", (event) => {
         }
     });
 });
+$("edit-kind").addEventListener("change", syncEditKind);
 $("close-dialog").addEventListener("click", () => $("edit-dialog").close());
 $("cancel-dialog").addEventListener("click", () => $("edit-dialog").close());
 $("search").addEventListener("input", filterTransactions);
 $("kind").addEventListener("change", filterTransactions);
+$("clear-filters").addEventListener("click", () => {
+    $("search").value = "";
+    $("kind").value = "";
+    filterTransactions();
+    $("search").focus();
+});
 $("prev-page").addEventListener("click", () => {
     if (transactionPage > 0) { transactionPage--; renderTransactions(); }
 });
@@ -347,7 +366,13 @@ $("file").addEventListener("change", () => {
         try {
             if (file.size > 2 * 1024 * 1024) throw new Error("Choose a CSV smaller than 2 MB.");
             const csv = new TextDecoder("utf-8", {fatal: true}).decode(await file.arrayBuffer());
-            const data = await request("/api/import", {name: file.name, csv});
+            let data;
+            try { data = await request("/api/import", {name: file.name, csv}); }
+            catch (error) {
+                if (!error.message.startsWith("CSV needs these columns:")) throw error;
+                await openStatementMapper(file.name, csv);
+                return;
+            }
             useState(data);
             notice(data.duplicate ? "Opened the saved copy of this import. Your edits are still here." : "CSV imported and saved. Review your spending below.");
         } finally { $("file").value = ""; }

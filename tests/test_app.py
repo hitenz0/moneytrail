@@ -52,6 +52,19 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(self.report()["summary"]["still_due"], Decimal("2200"))
         self.assertNotIn("d4", self.report()["category_suggestions"])
 
+    def test_transaction_type_can_correct_import_classification(self):
+        self.edit("d7", kind="purchase", category="Bills", refund_expected="0", refund_due="", refund_note="")
+        self.assertEqual(self.report()["summary"]["purchases"], Decimal("7480"))
+        self.edit("d7", kind="transfer")
+        self.assertEqual(self.report()["summary"]["purchases"], Decimal("4480"))
+        self.edit("d9", kind="transfer")
+        self.assertEqual(self.report()["summary"]["refunds"], Decimal("900"))
+        self.edit("d9", kind="refund", refund_for="d3")
+        self.assertEqual(self.report()["summary"]["refunds"], Decimal("1200"))
+        with self.assertRaises(ValueError):
+            self.edit("d7", kind="refund")
+        self.assertEqual(self.report()["summary"]["purchases"], Decimal("4480"))
+
     def test_reimport_original_preserves_edits(self):
         self.edit("d9", refund_for="d3")
         selected, duplicate = self.store.import_csv("Demo again", DEMO)
@@ -229,6 +242,35 @@ class WebTests(unittest.TestCase):
         self.assertIn("columns", error["error"])
         self.assertEqual(len(self.request("/api/state")[1]["datasets"]), 1)
 
+    def test_mapped_statement_preview_then_import(self):
+        from test_statement_import import OPTIONS, SPLIT
+        status, inspection = self.request("/api/import/inspect", {"csv": SPLIT})
+        self.assertEqual((status, inspection["count"]), (200, 4))
+        status, preview = self.request("/api/import/preview", {"csv": SPLIT, "options": OPTIONS})
+        self.assertEqual((status, preview["counts"]["refund"]), (200, 1))
+        self.assertEqual(self.request("/api/state")[1]["datasets"], [])
+        status, state = self.request("/api/import/mapped", {"name": "Bank", "csv": SPLIT, "options": OPTIONS})
+        self.assertEqual(status, 200)
+        self.assertEqual(state["report"]["summary"]["net"], "950.00")
+        status, duplicate = self.request("/api/import/mapped", {"name": "Bank", "csv": SPLIT, "options": OPTIONS})
+        self.assertTrue(duplicate["duplicate"])
+        self.assertEqual(self.request("/statement-import.js")[0], 200)
+        self.assertIn('id="statement-dialog"', self.request("/")[1])
+
+    def test_comparison_endpoint_and_assets(self):
+        from test_comparison import SAMPLE, periods
+        _, state = self.request("/api/import", {"name": "Comparison", "csv": SAMPLE})
+        data = periods(state["report"]["dataset"]["id"])
+        status, report = self.request("/api/compare", data)
+        self.assertEqual(status, 200)
+        self.assertEqual(report["changes"]["net"], "1800.00")
+        data["after"]["end"] = "2026-09-29"
+        status, error = self.request("/api/compare", data)
+        self.assertEqual(status, 400)
+        self.assertIn("same number", error["error"])
+        self.assertEqual(self.request("/comparison.js")[0], 200)
+        self.assertIn('id="comparison-section"', self.request("/")[1])
+
     def test_theme_script_is_served_and_loads_before_styles(self):
         status, script = self.request("/theme.js")
         self.assertEqual(status, 200)
@@ -236,6 +278,18 @@ class WebTests(unittest.TestCase):
         _, page = self.request("/")
         self.assertLess(page.index('src="/theme.js"'), page.index('href="/style.css"'))
         self.assertIn('data-theme-choice="dark"', page)
+
+    def test_installable_app_files_are_served(self):
+        status, manifest = self.request("/manifest.webmanifest")
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(manifest)["name"], "MoneyTrail")
+        self.assertEqual(self.request("/icon.svg")[0], 200)
+        status, install_script = self.request("/install.js")
+        self.assertEqual(status, 200)
+        self.assertIn("beforeinstallprompt", install_script)
+        _, page = self.request("/")
+        self.assertIn('rel="manifest"', page)
+        self.assertIn('id="install-app"', page)
 
     def test_followup_api_and_export(self):
         _, loaded = self.request("/api/demo", {})

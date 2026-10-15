@@ -3,11 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#f5f6f4" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0b0e0c" media="(prefers-color-scheme: dark)">
     <title>MoneyTrail — spending & refunds</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="manifest" href="/manifest.webmanifest">
     <script src="/theme.js"></script>
     <link rel="stylesheet" href="/style.css">
     <script src="/app.js" defer></script>
+    <script src="/statement-import.js" defer></script>
+    <script src="/comparison.js" defer></script>
     <script src="/bills.js" defer></script>
+    <script src="/install.js" defer></script>
 </head>
 <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -15,7 +22,7 @@
         <div class="header-inner">
             <div class="brand"><span class="brand-mark" aria-hidden="true">↗</span><div><h1>MoneyTrail<span class="brand-dot">.</span></h1><p class="brand-caption">SPENDING &amp; REFUNDS</p></div></div>
             <nav id="dashboard-nav" aria-label="Dashboard sections" hidden><a href="#dashboard">Overview</a><a href="#refund-section">Refunds</a><a href="#bills-section">Bills</a><a href="#transactions-section">Transactions</a></nav>
-            <div class="header-actions"><span class="local-badge"><span aria-hidden="true"></span>On your device</span><div class="theme-switch" role="group" aria-label="Color theme">
+            <div class="header-actions"><button id="install-app" class="secondary compact install-button" type="button" hidden>Install app</button><span class="local-badge"><span aria-hidden="true"></span>On your device</span><div class="theme-switch" role="group" aria-label="Color theme">
                 <button type="button" data-theme-choice="light" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>Light</button>
                 <button type="button" data-theme-choice="dark" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20.5 14.2A8.6 8.6 0 0 1 9.8 3.5 8.6 8.6 0 1 0 20.5 14.2Z"/></svg>Dark</button>
             </div></div>
@@ -49,6 +56,19 @@
             </div>
             <section><div class="section-heading"><div><h2>Refunds to review</h2><p class="note">Confirm which purchase a refund belongs to.</p></div><span class="tag" id="review-count"></span></div><div id="refund-review"></div></section>
         </div>
+        <section id="comparison-section" aria-labelledby="comparison-heading" hidden>
+            <div class="section-heading"><div><p class="eyebrow">UNDERSTAND THE CHANGE</p><h2 id="comparison-heading">What changed in my spending?</h2><p class="note">Compare two periods. See which purchases made the difference.</p></div><span class="tag">Spending trends</span></div>
+            <form id="comparison-form">
+                <div class="comparison-periods">
+                    <fieldset><legend>Earlier period</legend><label for="compare-before-dataset">Saved import</label><select id="compare-before-dataset" required></select><p id="compare-before-source" class="note small"></p><div class="comparison-dates"><label>From<input id="compare-before-start" type="date" required></label><label>Through<input id="compare-before-end" type="date" required></label></div></fieldset>
+                    <fieldset><legend>Later period</legend><label for="compare-after-dataset">Saved import</label><select id="compare-after-dataset" required></select><p id="compare-after-source" class="note small"></p><div class="comparison-dates"><label>From<input id="compare-after-start" type="date" required></label><label>Through<input id="compare-after-end" type="date" required></label></div></fieldset>
+                </div>
+                <div class="comparison-actions"><button id="compare-submit" type="submit">Compare spending</button><button id="compare-previous" type="button" class="secondary">Use preceding period</button><p class="note small">Choose equal lengths with no overlapping dates. You can use one import for both.</p></div>
+            </form>
+            <p id="comparison-status" class="note" role="status">Dates start with 28-day windows. Adjust them to match your statements.</p>
+            <div id="comparison-results" hidden></div>
+            <p class="section-footnote">Based only on imported transactions. Use the same accounts and complete statements for both periods. Purchases drive category changes; refunds are counted separately on the date received. Transfers are excluded.</p>
+        </section>
         <section id="bills-section" class="bills-section" aria-labelledby="bills-heading">
             <div class="section-heading"><div><p class="eyebrow">PLAN AHEAD</p><h2 id="bills-heading">Subscriptions &amp; bills</h2><p class="note">Your next payments, all in one place.</p></div><button id="add-bill" class="secondary" type="button"><span aria-hidden="true">+</span> Add a bill</button></div>
             <div id="bills-message" class="note small" role="status" hidden></div>
@@ -63,7 +83,7 @@
         </section>
         <section id="transactions-section" aria-labelledby="transactions-heading" hidden>
             <div class="section-heading"><div><p class="eyebrow">THE DETAILS</p><h2 id="transactions-heading">Transactions</h2></div><p class="note small" id="transaction-count" role="status"></p></div>
-            <div class="filters"><label>Search<input id="search" type="search" placeholder="Merchant, account, category or ID"></label><label>Transaction type<select id="kind"><option value="">All types</option><option value="purchase">Purchases</option><option value="refund">Refunds</option><option value="transfer">Transfers</option></select></label></div>
+            <div class="filters"><label>Search<input id="search" type="search" placeholder="Merchant, account, category or ID"></label><label>Transaction type<select id="kind"><option value="">All types</option><option value="purchase">Purchases</option><option value="refund">Refunds</option><option value="transfer">Transfers</option></select></label><button id="clear-filters" class="secondary filter-clear" type="button" hidden>Clear filters</button></div>
             <div class="table-wrap" tabindex="0" role="region" aria-label="Transactions table"><table><thead><tr><th scope="col">Date / ID</th><th scope="col">Description</th><th scope="col">Account</th><th scope="col">Category / link</th><th scope="col" class="amount">Amount</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody id="transactions"></tbody></table></div>
             <div class="table-footer"><p class="note small">Overview totals include the whole import.</p><div id="pagination" class="pagination" hidden><span id="page-label" class="note small" aria-live="polite"></span><button id="prev-page" class="secondary compact" type="button" aria-label="Previous page">← Previous</button><button id="next-page" class="secondary compact" type="button" aria-label="Next page">Next →</button></div></div>
         </section>
@@ -76,6 +96,7 @@
         <form id="edit-form">
             <div class="section-heading"><h2 id="edit-title">Edit transaction</h2><button type="button" id="close-dialog" class="icon-button" aria-label="Close edit dialog">×</button></div>
             <p id="edit-description"></p><p id="edit-details" class="note"></p>
+            <label for="edit-kind">Transaction type</label><select id="edit-kind"></select><p class="note small">Transfers are excluded from spending. Changing type clears any category or refund details that no longer apply.</p>
             <div id="purchase-fields"><label>Category<input id="edit-category" maxlength="200" list="category-options" placeholder="Choose or type a category"></label><datalist id="category-options"><option value="Food"><option value="Transport"><option value="Shopping"><option value="Study"><option value="Subscriptions"></datalist><label>Expected refund (INR)<input id="edit-expected" type="number" min="0" step="0.01" required></label><p class="note small">Enter how much you expect back, or 0 if no refund is expected.</p></div>
             <div id="followup-fields">
                 <label for="edit-due">Expected by (optional)</label><input id="edit-due" type="date" aria-describedby="due-help"><p id="due-help" class="note small">Use the date the merchant gave you. Clear it if you don't have one.</p>
@@ -96,6 +117,27 @@
             <p class="note small">The Autopay label helps you track the date. Confirm or change the actual payment in your bank or provider.</p>
             <p id="bill-form-error" class="error" role="alert" hidden></p>
             <div class="dialog-actions"><button type="button" id="bill-cancel" class="secondary">Cancel</button><button type="submit">Save bill</button></div>
+        </form>
+    </dialog>
+    <dialog id="statement-dialog" class="statement-dialog" aria-labelledby="statement-title">
+        <form id="statement-form">
+            <div class="section-heading"><div><p class="eyebrow">IMPORT YOUR OWN CSV</p><h2 id="statement-title">Map statement columns</h2></div><button type="button" id="statement-close" class="icon-button" aria-label="Close statement importer">×</button></div>
+            <p id="statement-file" class="note small"></p>
+            <p class="note small">Pick columns from your bank export. Nothing is saved until you review the preview and import.</p>
+            <div class="statement-fields">
+                <label>Date column<select id="statement-date"></select></label>
+                <label>Description column<select id="statement-description"></select></label>
+                <label>Date format<select id="statement-date-format"><option value="iso">YYYY-MM-DD</option><option value="dmy_slash">DD/MM/YYYY</option><option value="dmy_dash">DD-MM-YYYY</option><option value="mdy_slash">MM/DD/YYYY</option></select></label>
+                <label>Amount layout<select id="statement-mode"><option value="split">Separate debit and credit columns</option><option value="signed">One signed amount column</option></select></label>
+                <label id="statement-debit-field">Debit column<select id="statement-debit"></select></label>
+                <label id="statement-credit-field">Credit column<select id="statement-credit"></select></label>
+                <label id="statement-amount-field" hidden>Signed amount column<select id="statement-amount"></select></label>
+                <label>Account name<input id="statement-account" maxlength="100" placeholder="e.g. SBI UPI or HDFC Card" required></label>
+            </div>
+            <p class="note small">Positive credits with refund wording become refunds; other credits become transfers. Card-bill payments with clear wording become transfers. Check the preview before importing.</p>
+            <p id="statement-error" class="error" role="alert" hidden></p>
+            <div class="statement-preview" id="statement-preview" hidden><h3>Preview before import</h3><p id="statement-counts" class="note small"></p><div id="statement-sample" class="statement-sample"></div><p class="note small">The preview shows the first eight rows. The entire file is validated before it is saved.</p></div>
+            <div class="dialog-actions"><button id="statement-cancel" type="button" class="secondary">Cancel</button><button id="statement-check" type="button" class="secondary">Preview rows</button><button id="statement-import" type="submit" disabled>Import statement</button></div>
         </form>
     </dialog>
 </body>
