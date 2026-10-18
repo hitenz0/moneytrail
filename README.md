@@ -6,6 +6,12 @@ I use UPI and a credit card, and it can be hard to see where small spends went o
 
 Black and green in dark mode, with a separate light palette. [View the light theme](docs/preview-light.png). The previews use the student demo after a few review actions; all data shown is synthetic.
 
+## Hosted app
+
+[Open MoneyTrail](https://moneytrail.syrupypony1025.chatgpt.site) on a phone or laptop. The hosted app is private to my account and uses ChatGPT sign-in. It keeps imports, edits, and bill schedules in hosted storage so they are available across my devices. The hosted source and deployment notes are in [`site/`](site/README.md).
+
+The hosted database starts separately from the local `data/moneytrail.db`. To move a reviewed import, download its reviewed CSV from the local app and import that CSV into the hosted app. The local database remains untouched; bills can be re-entered. MoneyTrail does not connect to a bank or make payments.
+
 ## Run the web app
 
 Requires Python 3.10 or newer. There are no extra packages to install.
@@ -167,4 +173,4 @@ Run `node tests/test_comparison_frontend.cjs` for comparison date controls, evid
 
 ## Current scope
 
-This is a local app for one person, bound to 127.0.0.1. It has no bank connection, login system, or public hosting. Imports are separate workspaces rather than a combined account history. Bill dates are entered manually, and the app does not send notifications.
+The Python version is a local app bound to 127.0.0.1. The hosted version is private, uses ChatGPT sign-in, and stores data separately. Neither version has a bank connection or sends notifications. Imports are separate workspaces rather than a combined account history, and bill dates are entered manually.

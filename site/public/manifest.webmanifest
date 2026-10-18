@@ -1,0 +1,19 @@
+{
+  "id": "/index.html",
+  "name": "MoneyTrail",
+  "short_name": "MoneyTrail",
+  "description": "Track spending, refunds, subscriptions, and upcoming bills on your device.",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b0e0c",
+  "theme_color": "#0b0e0c",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

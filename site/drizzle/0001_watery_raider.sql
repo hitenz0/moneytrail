@@ -1,0 +1,1 @@
+ALTER TABLE `datasets` ADD `status` text DEFAULT 'ready' NOT NULL;
