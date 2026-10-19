@@ -2,7 +2,7 @@
   "id": "/index.html",
   "name": "MoneyTrail",
   "short_name": "MoneyTrail",
-  "description": "Track spending, refunds, subscriptions, and upcoming bills on your device.",
+  "description": "Track spending, refunds, subscriptions, and upcoming bills across your devices.",
   "start_url": "/index.html",
   "scope": "/",
   "display": "standalone",

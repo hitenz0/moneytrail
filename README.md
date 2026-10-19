@@ -8,7 +8,7 @@ Black and green in dark mode, with a separate light palette. [View the light the
 
 ## Hosted app
 
-[Open MoneyTrail](https://moneytrail.syrupypony1025.chatgpt.site) on a phone or laptop. The hosted app is private to my account and uses ChatGPT sign-in. It keeps imports, edits, and bill schedules in hosted storage so they are available across my devices. The hosted source and deployment notes are in [`site/`](site/README.md).
+[Open MoneyTrail](https://moneytrail.syrupypony1025.chatgpt.site) on a phone or laptop. The site uses ChatGPT sign-in; each signed-in account's imports, edits, and bill schedules are kept separately in hosted storage so they are available across devices. The hosted source and deployment notes are in [`site/`](site/README.md).
 
 The hosted database starts separately from the local `data/moneytrail.db`. To move a reviewed import, download its reviewed CSV from the local app and import that CSV into the hosted app. The local database remains untouched; bills can be re-entered. MoneyTrail does not connect to a bank or make payments.
 
@@ -173,4 +173,4 @@ Run `node tests/test_comparison_frontend.cjs` for comparison date controls, evid
 
 ## Current scope
 
-The Python version is a local app bound to 127.0.0.1. The hosted version is private, uses ChatGPT sign-in, and stores data separately. Neither version has a bank connection or sends notifications. Imports are separate workspaces rather than a combined account history, and bill dates are entered manually.
+The Python version is a local app bound to 127.0.0.1. The hosted website is publicly reachable, uses ChatGPT sign-in for account data, and stores data separately. Neither version has a bank connection or sends notifications. Imports are separate workspaces rather than a combined account history, and bill dates are entered manually.

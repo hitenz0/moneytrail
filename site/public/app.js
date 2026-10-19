@@ -47,6 +47,10 @@ async function request(path, body) {
     let data;
     try { data = await response.json(); }
     catch { throw new Error("MoneyTrail could not load. Reload this page and try again."); }
+    if (response.status === 401) {
+        window.location.assign("/signin-with-chatgpt?return_to=%2Findex.html");
+        throw new Error("Sign in to use MoneyTrail.");
+    }
     if (!response.ok) throw new Error(data.error || "Something went wrong. Please try again.");
     return data;
 }
@@ -91,7 +95,7 @@ async function save(row, changes) {
         dataset_id: state.report.dataset.id, version: state.report.dataset.version, id: row.id, changes
     });
     useState(data);
-    notice("Changes saved on this computer.");
+    notice("Changes saved to your account.");
 }
 
 function render() {
@@ -390,5 +394,3 @@ action(async () => {
     }
     useState(data);
 });
-
-\n

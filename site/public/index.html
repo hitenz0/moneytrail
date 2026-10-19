@@ -22,7 +22,7 @@
         <div class="header-inner">
             <div class="brand"><span class="brand-mark" aria-hidden="true">↗</span><div><h1>MoneyTrail<span class="brand-dot">.</span></h1><p class="brand-caption">SPENDING &amp; REFUNDS</p></div></div>
             <nav id="dashboard-nav" aria-label="Dashboard sections" hidden><a href="#dashboard">Overview</a><a href="#refund-section">Refunds</a><a href="#bills-section">Bills</a><a href="#transactions-section">Transactions</a></nav>
-            <div class="header-actions"><button id="install-app" class="secondary compact install-button" type="button" hidden>Install app</button><span class="local-badge"><span aria-hidden="true"></span>On your device</span><div class="theme-switch" role="group" aria-label="Color theme">
+            <div class="header-actions"><button id="install-app" class="secondary compact install-button" type="button" hidden>Install app</button><span class="local-badge"><span aria-hidden="true"></span>Saved online</span><div class="theme-switch" role="group" aria-label="Color theme">
                 <button type="button" data-theme-choice="light" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>Light</button>
                 <button type="button" data-theme-choice="dark" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20.5 14.2A8.6 8.6 0 0 1 9.8 3.5 8.6 8.6 0 1 0 20.5 14.2Z"/></svg>Dark</button>
             </div></div>
@@ -40,7 +40,7 @@
         <section id="empty" class="empty-panel">
             <span class="tag">START HERE</span><h2>See where you spent. Track what comes back.</h2>
             <p>Import your transactions as a CSV, or load the student demo to explore spending and refunds.</p>
-            <p class="note">Your imports and edits are saved on this computer. Each import is kept separate.</p>
+            <p class="note">Your imports and edits are saved to your signed-in account. Each import is kept separate.</p>
         </section>
         <div id="dashboard" hidden>
             <div class="section-heading overview-heading"><div><p class="eyebrow">SPENDING OVERVIEW</p><h2 id="dataset-name"></h2><p id="dataset-meta" class="note"></p></div><a id="export" class="button secondary" href="#"><span aria-hidden="true">↓</span> Download reviewed CSV</a></div>
@@ -90,7 +90,7 @@
         <details class="format-help"><summary>CSV format and how imports work</summary><p>Use UTF-8 text with these columns:</p><code>id,date,description,amount,account,kind,category,refund_expected,refund_for</code><p>Use dates like 2026-09-05. Purchases have negative amounts; refunds have positive amounts. Kind is purchase, refund, or transfer. Category, refund_expected, and refund_for can be blank. Limit: 2 MB and 10,000 rows.</p><p>Reimporting the same original file reopens its saved workspace. Your original CSV stays as it was; download the reviewed CSV to keep your edits in a file. Bank exports may need their columns converted first.</p>
         <p class="note small">CSV imports also accept optional refund_due and refund_note columns for purchases. Use YYYY-MM-DD for the expected date and up to 200 characters for a note. Reviewed CSV downloads include these details.</p>
         </details>
-        <footer><span>MoneyTrail<span class="brand-dot">.</span></span><span>Your money. Your device.</span></footer>
+        <footer><span>MoneyTrail<span class="brand-dot">.</span></span><span>Your money, wherever you are.</span></footer>
     </main>
     <dialog id="edit-dialog" aria-labelledby="edit-title">
         <form id="edit-form">
